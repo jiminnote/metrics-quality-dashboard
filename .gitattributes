@@ -1,0 +1,16 @@
+# GitHub 언어 인식을 위한 설정
+# SQL 파일이 Python 100%로 표시되는 문제 해결
+
+# SQL 파일 명시적 인식
+*.sql linguist-language=SQL
+*.sql linguist-detectable=true
+
+# Python 파일
+*.py linguist-language=Python
+
+# YAML 설정 파일
+*.yaml linguist-language=YAML
+*.yml linguist-language=YAML
+
+# Docker 파일
+docker-compose.yaml linguist-language=Dockerfile

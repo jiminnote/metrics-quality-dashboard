@@ -1,7 +1,7 @@
 # reports/
 *.csv
 *.json
-reports/*.html
+*.html
 
 # portfolio
 !index.html
