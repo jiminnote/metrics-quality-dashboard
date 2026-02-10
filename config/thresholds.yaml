@@ -1,0 +1,141 @@
+# ============================================================
+# 정합성 검증 임계값 & 파이프라인 설정
+# ============================================================
+# 이 파일에서 모든 검증 기준을 중앙 관리합니다.
+# Python 스크립트 / Airflow DAG 에서 동적으로 로드됩니다.
+# ============================================================
+
+# ─── 검증 임계값 (Thresholds) ─────────────────────────────
+
+thresholds:
+  sum_integrity:
+    tolerance: 1              # 허용 차이 (백만원)
+    severity: CRITICAL
+    description: "전체 이용금액과 카드사별 합계 일치 여부"
+
+  ratio_market_share:
+    tolerance: 0.1            # 허용 차이 (%)
+    severity: CRITICAL
+    description: "시장 점유율 합계 = 100% 검증"
+
+  ratio_category:
+    tolerance: 0.5            # 허용 차이 (%)
+    severity: WARNING
+    description: "업종별 비율 합계 = 100% 검증"
+
+  formula_mom:
+    tolerance: 10             # 허용 차이 (백만원)
+    severity: WARNING
+    description: "MoM 성장률 역산 검증"
+
+  formula_yoy:
+    tolerance: 10             # 허용 차이 (백만원)
+    severity: WARNING
+    description: "YoY 성장률 역산 검증"
+
+  range_activation:
+    min: 0
+    max: 100
+    severity: CRITICAL
+    description: "활성화율 유효 범위 (0~100%)"
+
+  range_hhi:
+    min: 0
+    max: 10000
+    severity: WARNING
+    description: "HHI 유효 범위 (0~10000)"
+
+  continuity:
+    max_missing_months: 0     # 허용 누락 월 수
+    severity: CRITICAL
+    description: "월 데이터 연속성 (누락 없음)"
+
+  statistical_anomaly:
+    z_score_warning: 2.0
+    z_score_critical: 3.0
+    max_critical_ratio: 5.0   # 전체 대비 CRITICAL 이상치 비율 (%)
+    severity: WARNING
+    description: "Z-Score 기반 이상치 비율 검증"
+
+  cross_kpi:
+    share_change_threshold: 0.5   # pp
+    growth_rate_threshold: -1.0   # %
+    severity: INFO
+    description: "점유율 변동 ↔ 성장률 교차 검증"
+
+
+# ─── 알림 설정 ────────────────────────────────────────────
+
+alerting:
+  # CRITICAL FAIL 시 즉시 알림
+  slack:
+    enabled: true
+    webhook_env_var: "SLACK_WEBHOOK_URL"     # 환경변수에서 읽기
+    channel: "#data-quality-alerts"
+    mention_on_critical: "@data-team"
+
+  # 일별 요약 이메일
+  email:
+    enabled: false
+    recipients:
+      - "data-team@example.com"
+    send_on: "always"         # always / failure_only
+
+
+# ─── 리포트 설정 ──────────────────────────────────────────
+
+reporting:
+  output_dir: "reports"
+  formats:
+    - csv
+    - json
+    - html
+  retention_days: 90          # 리포트 보관 기간
+  filename_pattern: "integrity_report_{date}"
+
+
+# ─── Airflow DAG 설정 ────────────────────────────────────
+
+airflow:
+  dag_id: "metrics_quality_monitoring"
+  schedule: "0 19 * * *"      # UTC 19:00 = KST 04:00
+  start_date: "2026-01-01"
+  max_active_runs: 1
+  retries: 2
+  retry_delay_minutes: 5
+  sla_minutes: 30             # 전체 파이프라인 SLA
+  postgres_conn_id: "metrics_db"
+  tags:
+    - metrics
+    - quality
+    - monitoring
+    - dataops
+
+
+# ─── 데이터 소스 설정 ────────────────────────────────────
+
+data_source:
+  name: "여신금융협회 신용카드 이용실적"
+  url: "https://www.crefia.or.kr"
+  period: "2024-01 ~ 2025-12"
+  refresh_cycle: "월 1회 (익월 말)"
+  card_companies:
+    - 신한카드
+    - 삼성카드
+    - KB국민카드
+    - 현대카드
+    - 우리카드
+    - 하나카드
+    - 롯데카드
+    - BC카드
+  business_categories:
+    - 음식점
+    - 주유소
+    - 대형마트
+    - 온라인쇼핑
+    - 교통
+    - 의료
+    - 교육
+    - 여행/숙박
+    - 보험
+    - 기타
