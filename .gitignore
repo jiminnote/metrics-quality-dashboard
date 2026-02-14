@@ -1,7 +1,10 @@
 # reports/
 *.csv
 *.json
-*.html
+reports/*.html
+
+# portfolio
+!index.html
 
 # data/
 data/
