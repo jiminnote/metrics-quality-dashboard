@@ -69,6 +69,7 @@ default_args = {
     "max_retry_delay": timedelta(minutes=30),
     "execution_timeout": timedelta(minutes=_airflow_cfg.get("sla_minutes", 30)),
     "on_failure_callback": lambda ctx: _on_task_failure(ctx),
+    "on_retry_callback": lambda ctx: _on_task_retry(ctx),
     "sla": timedelta(minutes=_airflow_cfg.get("sla_minutes", 30)),
 }
 
@@ -82,6 +83,12 @@ dag = DAG(
     tags=_airflow_cfg.get("tags", ["metrics", "quality", "monitoring", "dataops"]),
     max_active_runs=_airflow_cfg.get("max_active_runs", 1),
     doc_md=__doc__,
+    render_template_as_native_obj=True,
+    params={
+        "rerun_checks_only": False,   # True → refresh_kpi 건너뛰고 검증만 재실행
+        "skip_refresh": False,         # True → KPI 테이블 갱신 생략
+        "force_alert_level": None,     # "CRITICAL"/"WARNING" 강제 지정 (테스트용)
+    },
 )
 
 POSTGRES_CONN_ID = _airflow_cfg.get("postgres_conn_id", "metrics_db")
@@ -147,12 +154,33 @@ def _sla_miss_callback(dag, task_list, blocking_task_list, slas, blocking_tis):
 dag.sla_miss_callback = _sla_miss_callback
 
 
+def _on_task_retry(context: Dict[str, Any]) -> None:
+    """태스크 재시도 시 Slack 알림 — 재처리 가시성 확보"""
+    task = context.get("task_instance")
+    try_number = task.try_number if task else "?"
+    max_tries = task.max_tries if task else "?"
+
+    message = (
+        f"*Airflow Task 재시도*\n"
+        f"  DAG: `{context.get('dag', {}).dag_id}`\n"
+        f"  Task: `{task.task_id if task else 'unknown'}`\n"
+        f"  시도: {try_number}/{max_tries}\n"
+        f"  실행일: {context.get('execution_date')}"
+    )
+    _send_slack_notification(message, severity="WARNING")
+
+
 # ══════════════════════════════════════════════════════════
 # Task 함수
 # ══════════════════════════════════════════════════════════
 
 def run_integrity_checks_task(**context) -> str:
-    """10종 정합성 검증 실행"""
+    """10종 정합성 검증 실행
+
+    재처리 전략:
+      - 자동 재시도 시 동일 로직 재실행 (멱등성 보장)
+      - dag_run.conf.force_alert_level 설정 시 강제 분기 가능
+    """
     from scripts.run_integrity_checks import MetricsIntegrityChecker, load_config
 
     config_path = os.path.join(PROJECT_DIR, "config", "thresholds.yaml")
@@ -209,8 +237,19 @@ def run_integrity_checks_task(**context) -> str:
 
 
 def evaluate_results_task(**context) -> str:
-    """검증 결과에 따른 3-way 분기"""
-    status = context["ti"].xcom_pull(task_ids="integrity_checks.run_checks", key="overall_status")
+    """검증 결과에 따른 3-way 분기
+
+    재처리 전략:
+      - dag_run.conf.force_alert_level 로 강제 분기 가능 (테스트/디버깅용)
+      - 정상 흐름: CRITICAL → alert_critical, WARNING → alert_warning, PASS → log_success
+    """
+    # 수동 재처리 시 강제 알림 레벨 지정 지원
+    params = context.get("params", {})
+    force_level = params.get("force_alert_level")
+    if force_level in ("CRITICAL", "WARNING", "PASS"):
+        status = force_level
+    else:
+        status = context["ti"].xcom_pull(task_ids="integrity_checks.run_checks", key="overall_status")
 
     if status == "CRITICAL":
         return "alerting.alert_critical"
@@ -362,6 +401,8 @@ if TaskGroup:
         run_checks = PythonOperator(
             task_id="run_checks",
             python_callable=run_integrity_checks_task,
+            retries=3,  # 검증 태스크는 DB 연결 이슈로 재시도 여유 확보
+            retry_delay=timedelta(minutes=2),
         )
 
         evaluate = BranchPythonOperator(
@@ -369,11 +410,14 @@ if TaskGroup:
             python_callable=evaluate_results_task,
         )
 
+        # TaskGroup 내부 의존성: run_checks 완료 후 evaluate 분기
         run_checks >> evaluate
 else:
     run_checks = PythonOperator(
         task_id="run_checks",
         python_callable=run_integrity_checks_task,
+        retries=3,
+        retry_delay=timedelta(minutes=2),
         dag=dag,
     )
     evaluate = BranchPythonOperator(
@@ -384,45 +428,61 @@ else:
     run_checks >> evaluate
 
 # ── 알림 TaskGroup ──
+# BranchPythonOperator 하류 태스크는 NONE_FAILED_MIN_ONE_SUCCESS 필수:
+#   - Branch가 선택하지 않은 태스크는 SKIPPED 상태
+#   - 기본 trigger_rule(ALL_SUCCESS)면 SKIPPED를 실패로 간주하여 실행 불가
 if TaskGroup:
     with TaskGroup("alerting", dag=dag) as alert_group:
         alert_critical = PythonOperator(
             task_id="alert_critical",
             python_callable=alert_critical_task,
+            trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
         )
         escalate = PythonOperator(
             task_id="escalate_to_oncall",
             python_callable=escalate_to_oncall_task,
+            # escalate는 alert_critical 완료 후에만 실행 (ALL_DONE):
+            # alert_critical이 SKIPPED여도 escalate가 정리 로직 수행 가능
+            trigger_rule=TriggerRule.ALL_DONE,
+            retries=0,  # 에스컬레이션은 재시도 없이 즉시 판단
         )
         alert_warning = PythonOperator(
             task_id="alert_warning",
             python_callable=alert_warning_task,
+            trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
         )
         log_success = PythonOperator(
             task_id="log_success",
             python_callable=log_success_task,
+            trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
         )
 
+        # TaskGroup 내부 의존성: CRITICAL 경로만 escalate 연결
         alert_critical >> escalate
 else:
     alert_critical = PythonOperator(
         task_id="alert_critical",
         python_callable=alert_critical_task,
+        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
         dag=dag,
     )
     escalate = PythonOperator(
         task_id="escalate_to_oncall",
         python_callable=escalate_to_oncall_task,
+        trigger_rule=TriggerRule.ALL_DONE,
+        retries=0,
         dag=dag,
     )
     alert_warning = PythonOperator(
         task_id="alert_warning",
         python_callable=alert_warning_task,
+        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
         dag=dag,
     )
     log_success = PythonOperator(
         task_id="log_success",
         python_callable=log_success_task,
+        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
         dag=dag,
     )
     alert_critical >> escalate
@@ -446,8 +506,22 @@ cleanup_reports = PythonOperator(
 # ══════════════════════════════════════════════════════════
 # 의존성 그래프
 # ══════════════════════════════════════════════════════════
+#
+# 의존성 설계 원칙:
+#   1. Branch 하류 태스크는 NONE_FAILED_MIN_ONE_SUCCESS trigger_rule 사용
+#   2. escalate는 alert_critical의 직접 하류 → generate_report 상류에서 제외
+#      (escalate를 포함하면 SKIPPED 전파로 generate_report 실행 불가 위험)
+#   3. generate_report는 alerting 그룹의 leaf 태스크만 대기
+#   4. cleanup_reports는 ALL_DONE으로 항상 실행 (리포트 정리 보장)
+#
+# 재처리 시 dag_run.conf 활용:
+#   - {"skip_refresh": true} → refresh_kpis 결과 무시하고 검증 실행
+#   - {"rerun_checks_only": true} → 동일 효과
+#
 
 refresh_kpis >> run_checks
 evaluate >> [alert_critical, alert_warning, log_success]
-[alert_critical, escalate, alert_warning, log_success] >> generate_report
+# escalate는 alert_critical >> escalate 로 TaskGroup 내부에서 연결됨
+# generate_report 상류에서 제외하여 SKIPPED 전파 방지
+[alert_critical, alert_warning, log_success] >> generate_report
 generate_report >> cleanup_reports
