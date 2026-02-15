@@ -98,11 +98,117 @@ class ThresholdConfig:
 
 
 # ══════════════════════════════════════════════════════════
+# 설정 스키마 검증
+# ══════════════════════════════════════════════════════════
+
+class ConfigValidationError(Exception):
+    """YAML 설정 파일 스키마 검증 실패"""
+    pass
+
+
+# 각 threshold 키별 필수 필드 정의
+_THRESHOLD_SCHEMA: Dict[str, Dict[str, type]] = {
+    "sum_integrity":       {"tolerance": (int, float), "severity": str},
+    "ratio_market_share":  {"tolerance": (int, float), "severity": str},
+    "ratio_category":      {"tolerance": (int, float), "severity": str},
+    "formula_mom":         {"tolerance": (int, float), "severity": str},
+    "formula_yoy":         {"tolerance": (int, float), "severity": str},
+    "range_activation":    {"min": (int, float), "max": (int, float), "severity": str},
+    "range_hhi":           {"min": (int, float), "max": (int, float), "severity": str},
+    "continuity":          {"max_missing_months": (int, float), "severity": str},
+    "statistical_anomaly": {"z_score_warning": (int, float), "z_score_critical": (int, float), "severity": str},
+    "cross_kpi":           {"share_change_threshold": (int, float), "growth_rate_threshold": (int, float), "severity": str},
+}
+
+_VALID_SEVERITIES = {"CRITICAL", "WARNING", "INFO"}
+
+_REQUIRED_SECTIONS = ["thresholds"]
+
+
+def validate_config_schema(config: Dict[str, Any]) -> List[str]:
+    """YAML 설정 파일 스키마 검증
+
+    필수 섹션, 필수 키, 타입, severity 값 유효성을 검증합니다.
+
+    Args:
+        config: yaml.safe_load 로 로드된 설정 딕셔너리
+
+    Returns:
+        검증 오류 메시지 리스트 (빈 리스트 = 통과)
+    """
+    errors: List[str] = []
+
+    if not isinstance(config, dict):
+        return ["설정이 딕셔너리가 아닙니다."]
+
+    # 1) 필수 최상위 섹션 존재 확인
+    for section in _REQUIRED_SECTIONS:
+        if section not in config:
+            errors.append(f"필수 섹션 누락: '{section}'")
+
+    thresholds = config.get("thresholds")
+    if not isinstance(thresholds, dict):
+        if thresholds is not None:
+            errors.append("'thresholds' 섹션이 딕셔너리가 아닙니다.")
+        return errors
+
+    # 2) 각 threshold 키별 필수 필드 & 타입 검증
+    for key, required_fields in _THRESHOLD_SCHEMA.items():
+        if key not in thresholds:
+            errors.append(f"thresholds 내 필수 키 누락: '{key}'")
+            continue
+
+        entry = thresholds[key]
+        if not isinstance(entry, dict):
+            errors.append(f"thresholds.{key} 가 딕셔너리가 아닙니다.")
+            continue
+
+        for field_name, expected_types in required_fields.items():
+            if field_name not in entry:
+                errors.append(f"thresholds.{key} 내 필수 필드 누락: '{field_name}'")
+            else:
+                value = entry[field_name]
+                if not isinstance(value, expected_types):
+                    errors.append(
+                        f"thresholds.{key}.{field_name} 타입 오류: "
+                        f"기대={expected_types}, 실제={type(value).__name__}"
+                    )
+
+        # 3) severity 값 유효성
+        sev = entry.get("severity")
+        if isinstance(sev, str) and sev not in _VALID_SEVERITIES:
+            errors.append(
+                f"thresholds.{key}.severity 값 오류: '{sev}' "
+                f"(허용: {', '.join(sorted(_VALID_SEVERITIES))})"
+            )
+
+    # 4) reporting 섹션 검증 (존재 시)
+    reporting = config.get("reporting")
+    if reporting is not None:
+        if not isinstance(reporting, dict):
+            errors.append("'reporting' 섹션이 딕셔너리가 아닙니다.")
+        else:
+            if "output_dir" in reporting and not isinstance(reporting["output_dir"], str):
+                errors.append("reporting.output_dir 는 문자열이어야 합니다.")
+            if "formats" in reporting and not isinstance(reporting["formats"], list):
+                errors.append("reporting.formats 는 리스트여야 합니다.")
+            if "retention_days" in reporting:
+                rd = reporting["retention_days"]
+                if not isinstance(rd, (int, float)) or rd <= 0:
+                    errors.append("reporting.retention_days 는 양수여야 합니다.")
+
+    return errors
+
+
+# ══════════════════════════════════════════════════════════
 # 설정 로더
 # ══════════════════════════════════════════════════════════
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
-    """YAML 설정 파일 로드 — 없으면 기본값 사용"""
+    """YAML 설정 파일 로드 — 없으면 기본값 사용
+
+    스키마 검증을 수행하여 필수 키 누락 시 경고를 기록합니다.
+    """
     defaults = {
         "thresholds": {
             "sum_integrity": {"tolerance": 1, "severity": "CRITICAL"},
@@ -135,11 +241,38 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     if config_path and Path(config_path).exists():
         with open(config_path, "r", encoding="utf-8") as f:
             user_cfg = yaml.safe_load(f)
-        # 사용자 설정으로 기본값 오버라이드
+
+        # 스키마 검증 수행
+        if user_cfg:
+            validation_errors = validate_config_schema(user_cfg)
+            if validation_errors:
+                for err in validation_errors:
+                    logger.warning("설정 스키마 검증 경고: %s", err)
+                logger.warning(
+                    "스키마 검증 오류 %d건 — 기본값으로 보완합니다.", len(validation_errors)
+                )
+
+        # 사용자 설정으로 기본값 오버라이드 (딥 머지: 누락 필드는 기본값 유지)
         if user_cfg:
             for section in ("thresholds", "reporting", "alerting"):
-                if section in user_cfg:
-                    defaults.setdefault(section, {}).update(user_cfg[section])
+                if section not in user_cfg:
+                    continue
+                if section not in defaults:
+                    defaults[section] = user_cfg[section]
+                elif isinstance(defaults[section], dict) and isinstance(user_cfg[section], dict):
+                    for key, val in user_cfg[section].items():
+                        if (
+                            key in defaults[section]
+                            and isinstance(defaults[section][key], dict)
+                            and isinstance(val, dict)
+                        ):
+                            # threshold 개별 키 수준에서 딥 머지
+                            merged = {**defaults[section][key], **val}
+                            defaults[section][key] = merged
+                        else:
+                            defaults[section][key] = val
+                else:
+                    defaults[section] = user_cfg[section]
         logger.info("설정 로드 완료: %s", config_path)
     else:
         logger.info("기본 설정 사용 (YAML 파일 없음)")

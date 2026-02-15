@@ -50,6 +50,20 @@ try:
     _config_path = os.path.join(PROJECT_DIR, "config", "thresholds.yaml")
     with open(_config_path, "r", encoding="utf-8") as _f:
         DAG_CONFIG = yaml.safe_load(_f)
+
+    # 스키마 사전 검증 — DAG 파싱 단계에서 설정 오류 조기 탐지
+    from scripts.run_integrity_checks import validate_config_schema
+
+    _schema_errors = validate_config_schema(DAG_CONFIG) if DAG_CONFIG else ["빈 설정 파일"]
+    if _schema_errors:
+        import logging as _logging
+
+        _dag_logger = _logging.getLogger("metrics_quality_dag")
+        for _err in _schema_errors:
+            _dag_logger.warning("DAG 설정 스키마 검증 경고: %s", _err)
+
+    if not DAG_CONFIG:
+        DAG_CONFIG = {}
 except Exception:
     DAG_CONFIG = {}
 

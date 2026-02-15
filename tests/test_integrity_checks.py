@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from run_integrity_checks import (
     CheckStatus,
+    ConfigValidationError,
     IntegrityCheckResult,
     MetricsIntegrityChecker,
     Severity,
@@ -28,6 +29,7 @@ from run_integrity_checks import (
     detect_trend_break,
     generate_demo_data,
     load_config,
+    validate_config_schema,
 )
 
 
@@ -126,6 +128,127 @@ class TestConfig:
         if config_path.exists():
             config = load_config(str(config_path))
             assert config["thresholds"]["sum_integrity"]["tolerance"] == 1
+
+
+# ══════════════════════════════════════════════════════════
+# 스키마 검증 테스트
+# ══════════════════════════════════════════════════════════
+
+
+class TestConfigSchemaValidation:
+    """YAML 설정 스키마 검증 테스트"""
+
+    def _build_valid_config(self) -> dict:
+        """검증 통과하는 최소 설정 생성"""
+        return {
+            "thresholds": {
+                "sum_integrity": {"tolerance": 1, "severity": "CRITICAL"},
+                "ratio_market_share": {"tolerance": 0.1, "severity": "CRITICAL"},
+                "ratio_category": {"tolerance": 0.5, "severity": "WARNING"},
+                "formula_mom": {"tolerance": 10, "severity": "WARNING"},
+                "formula_yoy": {"tolerance": 10, "severity": "WARNING"},
+                "range_activation": {"min": 0, "max": 100, "severity": "CRITICAL"},
+                "range_hhi": {"min": 0, "max": 10000, "severity": "WARNING"},
+                "continuity": {"max_missing_months": 0, "severity": "CRITICAL"},
+                "statistical_anomaly": {
+                    "z_score_warning": 2.0,
+                    "z_score_critical": 3.0,
+                    "severity": "WARNING",
+                },
+                "cross_kpi": {
+                    "share_change_threshold": 0.5,
+                    "growth_rate_threshold": -1.0,
+                    "severity": "INFO",
+                },
+            },
+        }
+
+    def test_valid_config_passes(self):
+        """정상 설정은 오류 없이 통과"""
+        config = self._build_valid_config()
+        errors = validate_config_schema(config)
+        assert errors == []
+
+    def test_actual_yaml_file_passes(self):
+        """실제 thresholds.yaml 파일 스키마 검증 통과"""
+        import yaml
+
+        config_path = Path(__file__).resolve().parent.parent / "config" / "thresholds.yaml"
+        if config_path.exists():
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+            errors = validate_config_schema(config)
+            assert errors == [], f"실제 YAML 스키마 오류: {errors}"
+
+    def test_missing_thresholds_section(self):
+        """thresholds 섹션 누락 시 오류"""
+        errors = validate_config_schema({"reporting": {}})
+        assert any("thresholds" in e for e in errors)
+
+    def test_missing_threshold_key(self):
+        """특정 threshold 키 누락 시 오류"""
+        config = self._build_valid_config()
+        del config["thresholds"]["sum_integrity"]
+        errors = validate_config_schema(config)
+        assert any("sum_integrity" in e for e in errors)
+
+    def test_missing_required_field(self):
+        """threshold 내 필수 필드 누락 시 오류"""
+        config = self._build_valid_config()
+        del config["thresholds"]["sum_integrity"]["tolerance"]
+        errors = validate_config_schema(config)
+        assert any("tolerance" in e for e in errors)
+
+    def test_wrong_type_tolerance(self):
+        """tolerance 타입 오류 (문자열) 시 검출"""
+        config = self._build_valid_config()
+        config["thresholds"]["sum_integrity"]["tolerance"] = "abc"
+        errors = validate_config_schema(config)
+        assert any("타입 오류" in e for e in errors)
+
+    def test_invalid_severity_value(self):
+        """severity 값이 허용 범위 밖일 때 검출"""
+        config = self._build_valid_config()
+        config["thresholds"]["sum_integrity"]["severity"] = "FATAL"
+        errors = validate_config_schema(config)
+        assert any("severity 값 오류" in e for e in errors)
+
+    def test_non_dict_config(self):
+        """설정이 딕셔너리가 아닌 경우"""
+        errors = validate_config_schema("not_a_dict")
+        assert len(errors) == 1
+        assert "딕셔너리" in errors[0]
+
+    def test_non_dict_thresholds(self):
+        """thresholds가 딕셔너리가 아닌 경우"""
+        errors = validate_config_schema({"thresholds": "invalid"})
+        assert any("딕셔너리" in e for e in errors)
+
+    def test_invalid_reporting_retention(self):
+        """reporting.retention_days가 음수인 경우"""
+        config = self._build_valid_config()
+        config["reporting"] = {"retention_days": -10}
+        errors = validate_config_schema(config)
+        assert any("retention_days" in e for e in errors)
+
+    def test_valid_reporting_section(self):
+        """정상 reporting 섹션은 오류 없음"""
+        config = self._build_valid_config()
+        config["reporting"] = {
+            "output_dir": "reports",
+            "formats": ["csv", "json"],
+            "retention_days": 90,
+        }
+        errors = validate_config_schema(config)
+        assert errors == []
+
+    def test_load_config_with_invalid_yaml_logs_warning(self, tmp_path):
+        """잘못된 YAML 로드 시 경고 로그 출력 후 기본값 보완"""
+        bad_yaml = tmp_path / "bad.yaml"
+        bad_yaml.write_text("thresholds:\n  sum_integrity:\n    severity: CRITICAL\n")
+        config = load_config(str(bad_yaml))
+        # 기본값으로 보완되어 tolerance 필드가 존재해야 함
+        assert "tolerance" in config["thresholds"]["sum_integrity"]
 
 
 # ══════════════════════════════════════════════════════════
