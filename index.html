@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KPI 정합성 모니터링 대시보드 — 포트폴리오</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ═══════════════════ RESET & BASE ═══════════════════ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: 'Noto Sans KR', 'Inter', -apple-system, sans-serif;
+      background: #0b0f1a;
+      color: #d1d5e0;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    code, pre {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+    img { max-width: 100%; }
+
+    /* ═══════════════════ UTILITIES ═══════════════════ */
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em;
+    }
+    .badge-critical { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.25); }
+    .badge-warning  { background: rgba(245,158,11,.12); color: #fbbf24; border: 1px solid rgba(245,158,11,.22); }
+    .badge-info     { background: rgba(59,130,246,.12); color: #60a5fa; border: 1px solid rgba(59,130,246,.22); }
+    .badge-pass     { background: rgba(16,185,129,.12); color: #34d399; border: 1px solid rgba(16,185,129,.22); }
+    .section-label {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: #60a5fa; margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: 1.85rem; font-weight: 800; color: #f0f2f8;
+      line-height: 1.3; margin-bottom: 14px;
+    }
+    .section-desc {
+      font-size: 0.95rem; color: #8b93a7; max-width: 680px; margin-bottom: 36px;
+    }
+    .glass-card {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      transition: border-color .25s, box-shadow .25s, transform .25s;
+    }
+    .glass-card:hover {
+      border-color: rgba(96,165,250,.2);
+      box-shadow: 0 0 30px rgba(96,165,250,.06);
+      transform: translateY(-2px);
+    }
+
+    /* ═══════════════════ NAV ═══════════════════ */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(11,15,26,.82);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    nav .nav-inner {
+      max-width: 1120px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    nav .logo {
+      font-size: 0.85rem; font-weight: 700; color: #f0f2f8;
+      display: flex; align-items: center; gap: 8px;
+    }
+    nav .logo i { color: #60a5fa; }
+    nav .nav-links { display: flex; gap: 26px; }
+    nav .nav-links a {
+      font-size: 0.78rem; font-weight: 500; color: #8b93a7;
+      transition: color .2s;
+    }
+    nav .nav-links a:hover { color: #f0f2f8; }
+
+    /* ═══════════════════ HERO ═══════════════════ */
+    .hero {
+      padding: 140px 0 80px;
+      background:
+        radial-gradient(ellipse 60% 50% at 50% -10%, rgba(59,130,246,.10) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 70% 20%, rgba(139,92,246,.07) 0%, transparent 70%);
+    }
+    .hero .overline {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.15em;
+      color: #60a5fa; text-transform: uppercase; margin-bottom: 14px;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 4.5vw, 3rem); font-weight: 800;
+      color: #f0f2f8; line-height: 1.2; margin-bottom: 16px;
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero .subtitle {
+      font-size: 1.05rem; color: #8b93a7; max-width: 620px;
+      margin-bottom: 28px; line-height: 1.7;
+    }
+    .hero .meta-row {
+      display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 32px;
+    }
+    .hero .meta-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.78rem; color: #6b7490;
+    }
+    .hero .meta-item i { width: 15px; height: 15px; color: #475176; }
+    .hero .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 22px; border-radius: 10px;
+      font-size: 0.82rem; font-weight: 600;
+      transition: all .2s;
+    }
+    .hero .btn-primary {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #fff; border: none;
+    }
+    .hero .btn-primary:hover { box-shadow: 0 4px 24px rgba(59,130,246,.35); transform: translateY(-1px); }
+    .hero .btn-outline {
+      border: 1px solid rgba(255,255,255,.12); color: #c4c9d8;
+      background: rgba(255,255,255,.03);
+    }
+    .hero .btn-outline:hover { border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.06); }
+
+    /* ── Pipeline Flow ── */
+    .pipeline-flow {
+      margin-top: 48px; padding: 28px 32px;
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 14px;
+    }
+    .pipeline-flow .flow-label {
+      font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em;
+      color: #475176; text-transform: uppercase; margin-bottom: 18px;
+    }
+    .pipeline-steps {
+      display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+    }
+    .pipeline-step {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px; border-radius: 10px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.07);
+      font-size: 0.78rem; font-weight: 600; color: #c4c9d8;
+      white-space: nowrap;
+    }
+    .pipeline-step i { width: 16px; height: 16px; }
+    .pipeline-step.step-sql i { color: #60a5fa; }
+    .pipeline-step.step-py i { color: #a78bfa; }
+    .pipeline-step.step-branch i { color: #fbbf24; }
+    .pipeline-step.step-alert i { color: #f87171; }
+    .pipeline-step.step-report i { color: #34d399; }
+    .pipeline-arrow {
+      color: #2d3454; font-size: 1.1rem; margin: 0 6px;
+      flex-shrink: 0;
+    }
+
+    /* ═══════════════════ SECTION: BACKGROUND ═══════════════════ */
+    section { padding: 80px 0; }
+    section:nth-child(even) { background: rgba(255,255,255,.01); }
+
+    .bg-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .bg-card {
+      padding: 28px;
+    }
+    .bg-card .icon-wrap {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .bg-card .icon-wrap i { width: 22px; height: 22px; }
+    .bg-card h3 { font-size: 1rem; font-weight: 700; color: #e8eaf0; margin-bottom: 8px; }
+    .bg-card p { font-size: 0.85rem; color: #7c849a; line-height: 1.65; }
+    .icon-red    { background: rgba(239,68,68,.1); color: #f87171; }
+    .icon-blue   { background: rgba(59,130,246,.1); color: #60a5fa; }
+    .icon-purple { background: rgba(139,92,246,.1); color: #a78bfa; }
+
+    /* ═══════════════════ ARCHITECTURE ═══════════════════ */
+    .arch-img-wrap {
+      padding: 0; overflow: hidden; border-radius: 16px;
+      background: rgba(255,255,255,.03);
+    }
+    .arch-img {
+      display: block; width: 100%; height: auto;
+      border-radius: 14px;
+      transition: transform .3s ease;
+    }
+    .arch-img:hover { transform: scale(1.02); }
+    .arch-diagram {
+      padding: 36px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem; line-height: 1.65;
+      color: #8b93a7; overflow-x: auto;
+      white-space: pre;
+    }
+    .arch-diagram .hl-blue { color: #60a5fa; }
+    .arch-diagram .hl-purple { color: #a78bfa; }
+    .arch-diagram .hl-yellow { color: #fbbf24; }
+    .arch-diagram .hl-red { color: #f87171; }
+    .arch-diagram .hl-green { color: #34d399; }
+    .arch-diagram .hl-dim { color: #3d4562; }
+
+    /* ═══════════════════ KPI CARDS ═══════════════════ */
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 18px;
+    }
+    .kpi-card { padding: 26px 24px; }
+    .kpi-card .kpi-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 8px;
+      font-size: 0.75rem; font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .kpi-card h3 {
+      font-size: 0.95rem; font-weight: 700; color: #e8eaf0; margin-bottom: 6px;
+    }
+    .kpi-card .kpi-def {
+      font-size: 0.8rem; color: #7c849a; margin-bottom: 12px;
+    }
+    .kpi-card .sql-tag {
+      display: inline-block; padding: 4px 10px; border-radius: 6px;
+      background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.15);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem; color: #60a5fa;
+    }
+    .kpi-card .unit {
+      float: right; font-size: 0.7rem; color: #5b6380;
+      margin-top: 2px;
+    }
+    .num-blue   { background: rgba(59,130,246,.12); color: #60a5fa; }
+    .num-purple { background: rgba(139,92,246,.12); color: #a78bfa; }
+    .num-teal   { background: rgba(20,184,166,.12); color: #2dd4bf; }
+    .num-amber  { background: rgba(245,158,11,.12); color: #fbbf24; }
+    .num-rose   { background: rgba(244,63,94,.12);  color: #fb7185; }
+    .num-green  { background: rgba(16,185,129,.12); color: #34d399; }
+    .num-orange { background: rgba(249,115,22,.12); color: #fb923c; }
+
+    /* ── SQL Showcase ── */
+    .sql-showcase {
+      margin-top: 36px; padding: 28px 30px;
+      border-radius: 14px;
+      background: rgba(15,20,35,.7);
+      border: 1px solid rgba(255,255,255,.05);
+    }
+    .sql-showcase .showcase-title {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+      color: #475176; margin-bottom: 18px; text-transform: uppercase;
+    }
+    .sql-showcase pre {
+      font-size: 0.75rem; line-height: 1.7; color: #8b93a7; overflow-x: auto;
+    }
+    .sql-showcase .kw   { color: #c084fc; font-weight: 600; }
+    .sql-showcase .fn   { color: #60a5fa; }
+    .sql-showcase .str  { color: #34d399; }
+    .sql-showcase .cmt  { color: #3d4562; font-style: italic; }
+    .sql-showcase .num  { color: #fbbf24; }
+    .sql-showcase .tbl  { color: #f0f2f8; }
+    .sql-showcase .alias { color: #f9a8d4; }
+
+    /* ═══════════════════ INTEGRITY CHECKS ═══════════════════ */
+    .check-table-wrap {
+      overflow-x: auto; border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .check-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .check-table thead {
+      background: rgba(255,255,255,.03);
+    }
+    .check-table th {
+      padding: 14px 18px; text-align: left;
+      font-weight: 600; color: #7c849a;
+      font-size: 0.72rem; letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .check-table td {
+      padding: 13px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.03);
+      color: #b0b7c9;
+    }
+    .check-table tbody tr:hover {
+      background: rgba(59,130,246,.03);
+    }
+    .check-table .mono {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+    }
+
+    /* ── Severity Breakdown ── */
+    .severity-cards {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+      margin-top: 32px;
+    }
+    .sev-card {
+      padding: 24px; border-radius: 14px; text-align: center;
+    }
+    .sev-card h4 { font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; }
+    .sev-card .sev-action { font-size: 0.75rem; color: #6b7490; margin-bottom: 10px; }
+    .sev-card .sev-checks { font-size: 0.72rem; color: #5b6380; line-height: 1.6; }
+    .sev-critical { border: 1px solid rgba(239,68,68,.2); background: rgba(239,68,68,.04); }
+    .sev-critical h4 { color: #f87171; }
+    .sev-warning { border: 1px solid rgba(245,158,11,.2); background: rgba(245,158,11,.04); }
+    .sev-warning h4 { color: #fbbf24; }
+    .sev-info { border: 1px solid rgba(59,130,246,.2); background: rgba(59,130,246,.04); }
+    .sev-info h4 { color: #60a5fa; }
+
+    /* ═══════════════════ TABLEAU ═══════════════════ */
+    .dash-tabs {
+      display: flex; gap: 6px; margin-bottom: 0;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      padding-bottom: 0;
+    }
+    .dash-tab {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 11px 20px; border: none; cursor: pointer;
+      font-family: inherit; font-size: 0.78rem; font-weight: 600;
+      color: #6b7490; background: transparent;
+      border-bottom: 2px solid transparent;
+      transition: all .2s;
+    }
+    .dash-tab:hover { color: #c4c9d8; }
+    .dash-tab.active {
+      color: #60a5fa;
+      border-bottom-color: #60a5fa;
+      background: rgba(59,130,246,.04);
+    }
+    .dash-panel { display: none; padding-top: 24px; }
+    .dash-panel.active { display: block; }
+    .dash-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+    }
+    .dash-title { font-size: 1.1rem; font-weight: 700; color: #e8eaf0; }
+    .dash-sub { font-size: 0.78rem; color: #6b7490; margin-top: 4px; }
+    .dash-period {
+      font-size: 0.72rem; font-weight: 600; color: #475176;
+      padding: 6px 14px; border-radius: 8px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    }
+    .view-tag-inline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem; color: #a78bfa;
+      background: rgba(139,92,246,.08); padding: 2px 8px; border-radius: 4px;
+    }
+    .scorecard-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      margin-bottom: 20px;
+    }
+    .scorecard {
+      padding: 18px 20px; border-radius: 12px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    }
+    .sc-label { font-size: 0.68rem; color: #6b7490; margin-bottom: 6px; }
+    .sc-value { font-size: 1.5rem; font-weight: 800; color: #e8eaf0; }
+    .sc-unit { font-size: 0.72rem; font-weight: 600; color: #6b7490; margin-left: 2px; }
+    .sc-change { font-size: 0.68rem; font-weight: 600; margin-top: 4px; }
+    .sc-change.positive { color: #34d399; }
+    .sc-change.negative { color: #f87171; }
+    .sc-change.neutral { color: #6b7490; }
+    .chart-row-2 {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    }
+    .chart-box { padding: 22px 24px; }
+    .chart-box.chart-box-sm { max-width: 100%; }
+    .chart-title {
+      font-size: 0.72rem; font-weight: 600; color: #6b7490;
+      margin-bottom: 14px; letter-spacing: 0.02em;
+    }
+    .heatmap-wrap, .matrix-wrap { overflow-x: auto; }
+    .hm-table, .mx-table { border-collapse: collapse; width: 100%; font-size: 0.7rem; }
+    .hm-table th, .mx-table th {
+      padding: 8px 10px; text-align: center; font-weight: 600;
+      color: #6b7490; font-size: 0.65rem; letter-spacing: 0.03em;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .hm-table td, .mx-table td {
+      padding: 7px 10px; text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,.03); color: #b0b7c9;
+    }
+    .hm-table td.row-header, .mx-table td.row-header {
+      text-align: left; font-weight: 600; color: #8b93a7;
+    }
+
+    @media (max-width: 768px) {
+      .scorecard-row { grid-template-columns: repeat(2, 1fr); }
+      .chart-row-2 { grid-template-columns: 1fr; }
+      .dash-tabs { overflow-x: auto; flex-wrap: nowrap; }
+      .dash-tab { white-space: nowrap; font-size: 0.72rem; padding: 10px 14px; }
+    }
+
+    .tableau-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 18px;
+    }
+    .tableau-card { padding: 28px; position: relative; overflow: hidden; }
+    .tableau-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .tableau-card.tc-overview::before { background: linear-gradient(90deg, #3b82f6, #6366f1); }
+    .tableau-card.tc-growth::before  { background: linear-gradient(90deg, #10b981, #14b8a6); }
+    .tableau-card.tc-quality::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+    .tableau-card .tc-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .tableau-card .tc-icon i { width: 20px; height: 20px; }
+    .tc-overview .tc-icon { background: rgba(59,130,246,.1); color: #60a5fa; }
+    .tc-growth  .tc-icon { background: rgba(16,185,129,.1); color: #34d399; }
+    .tc-quality .tc-icon { background: rgba(245,158,11,.1); color: #fbbf24; }
+    .tableau-card h3 { font-size: 0.95rem; font-weight: 700; color: #e8eaf0; margin-bottom: 8px; }
+    .tableau-card p  { font-size: 0.82rem; color: #7c849a; line-height: 1.6; }
+    .tableau-card ul {
+      list-style: none; margin-top: 14px;
+    }
+    .tableau-card li {
+      font-size: 0.78rem; color: #8b93a7; padding: 5px 0;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .tableau-card li::before {
+      content: ''; width: 5px; height: 5px; border-radius: 50%;
+      background: #3d4562; margin-top: 7px; flex-shrink: 0;
+    }
+    .view-tag {
+      display: inline-block; margin-top: 14px;
+      padding: 5px 12px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem; color: #a78bfa;
+      background: rgba(139,92,246,.08);
+      border: 1px solid rgba(139,92,246,.15);
+    }
+
+    /* ═══════════════════ TECH STACK ═══════════════════ */
+    .stack-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .stack-item {
+      padding: 20px 16px; text-align: center;
+    }
+    .stack-item .stack-icon {
+      width: 42px; height: 42px; margin: 0 auto 12px;
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; font-weight: 800;
+    }
+    .stack-item h4 { font-size: 0.82rem; font-weight: 700; color: #e0e3ec; margin-bottom: 4px; }
+    .stack-item p  { font-size: 0.7rem; color: #6b7490; }
+    .si-pg   { background: rgba(59,130,246,.1); color: #60a5fa; }
+    .si-py   { background: rgba(245,158,11,.1); color: #fbbf24; }
+    .si-air  { background: rgba(16,185,129,.1); color: #34d399; }
+    .si-tab  { background: rgba(139,92,246,.1); color: #a78bfa; }
+    .si-dock { background: rgba(59,130,246,.1); color: #60a5fa; }
+    .si-test { background: rgba(244,63,94,.1);  color: #fb7185; }
+    .si-yaml { background: rgba(245,158,11,.1); color: #fbbf24; }
+
+    /* ═══════════════════ DESIGN DECISIONS ═══════════════════ */
+    .decision-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+      gap: 18px;
+    }
+    .decision-card { padding: 28px; }
+    .decision-card .q {
+      font-size: 0.9rem; font-weight: 700; color: #e8eaf0;
+      margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px;
+    }
+    .decision-card .q i { color: #60a5fa; flex-shrink: 0; margin-top: 2px; }
+    .decision-card .a {
+      font-size: 0.82rem; color: #7c849a; line-height: 1.7;
+      padding-left: 30px;
+    }
+
+    /* ═══════════════════ TESTS ═══════════════════ */
+    .test-summary {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+      margin-bottom: 28px;
+    }
+    .test-stat {
+      padding: 22px; text-align: center;
+    }
+    .test-stat .num { font-size: 1.6rem; font-weight: 800; color: #e8eaf0; }
+    .test-stat .label { font-size: 0.72rem; color: #6b7490; margin-top: 4px; }
+    .test-categories {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .test-cat {
+      padding: 16px 20px; display: flex; align-items: center; gap: 10px;
+    }
+    .test-cat .dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .test-cat .cat-name { font-size: 0.8rem; color: #b0b7c9; flex: 1; }
+    .test-cat .cat-count { font-size: 0.75rem; font-weight: 700; color: #8b93a7; }
+
+    /* ═══════════════════ PRACTICAL ═══════════════════ */
+    .practical-table-wrap {
+      overflow-x: auto; border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .practical-table {
+      width: 100%; border-collapse: collapse; font-size: 0.8rem;
+    }
+    .practical-table th {
+      padding: 14px 20px; text-align: left;
+      font-weight: 600; color: #7c849a; font-size: 0.72rem;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      background: rgba(255,255,255,.03);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .practical-table td {
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(255,255,255,.03);
+      color: #b0b7c9; vertical-align: top;
+    }
+    .practical-table tbody tr:hover { background: rgba(59,130,246,.03); }
+    .practical-table .highlight { color: #60a5fa; font-weight: 600; }
+
+    /* ═══════════════════ FOOTER ═══════════════════ */
+    footer {
+      padding: 48px 0; text-align: center;
+      border-top: 1px solid rgba(255,255,255,.05);
+    }
+    footer .footer-links {
+      display: flex; justify-content: center; gap: 24px; margin-bottom: 16px;
+    }
+    footer .footer-links a {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.82rem; color: #6b7490; transition: color .2s;
+    }
+    footer .footer-links a:hover { color: #60a5fa; }
+    footer .copyright { font-size: 0.72rem; color: #3d4562; }
+
+    /* ═══════════════════ RESPONSIVE ═══════════════════ */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 1.6rem; }
+      .pipeline-steps { gap: 8px; }
+      .pipeline-arrow { display: none; }
+      .pipeline-step { font-size: 0.7rem; padding: 8px 12px; }
+      .severity-cards { grid-template-columns: 1fr; }
+      .decision-grid { grid-template-columns: 1fr; }
+      .test-summary { grid-template-columns: repeat(2, 1fr); }
+      nav .nav-links { display: none; }
+      .kpi-grid { grid-template-columns: 1fr; }
+      .sql-showcase pre { font-size: 0.65rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ NAV ═══════════════════ -->
+<nav>
+  <div class="nav-inner">
+    <div class="logo">
+      <i data-lucide="bar-chart-3" style="width:18px;height:18px;"></i>
+      KPI 정합성 모니터링
+    </div>
+    <div class="nav-links">
+      <a href="#background">배경</a>
+      <a href="#architecture">아키텍처</a>
+      <a href="#kpi">KPI 설계</a>
+      <a href="#integrity">정합성 검증</a>
+      <a href="#tableau">Tableau</a>
+      <a href="#stack">기술 스택</a>
+      <a href="#decisions">설계 결정</a>
+      <a href="#tests">테스트</a>
+    </div>
+  </div>
+</nav>
+
+
+<!-- ═══════════════════ 1. HERO ═══════════════════ -->
+<section class="hero">
+  <div class="container">
+    <p class="overline">Portfolio Project</p>
+    <h1><em>KPI 정합성</em> 모니터링 대시보드</h1>
+    <p class="subtitle">
+      여신금융협회 카드사 이용실적 데이터 기반 — 핵심 KPI 7종 정의 →
+      10종 교차 정합성 검증 → 3단계 심각도 분류 → Tableau 대시보드 시각화
+    </p>
+
+    <div class="meta-row">
+      <span class="meta-item"><i data-lucide="calendar"></i> 2026.01 – 2026.02 (4주)</span>
+      <span class="meta-item"><i data-lucide="user"></i> 개인 프로젝트 (설계 · 개발 · 운영 전체)</span>
+      <span class="meta-item"><i data-lucide="database"></i> 금융 도메인 (카드사 이용실적)</span>
+      <span class="meta-item"><i data-lucide="git-branch"></i> DW/DM 설계 + 데이터 품질</span>
+    </div>
+
+    <div class="btn-row">
+      <a href="https://github.com/jiminnote/metrics-quality-dashboard" target="_blank" class="btn btn-primary">
+        <i data-lucide="github" style="width:16px;height:16px;"></i> GitHub 바로가기
+      </a>
+      <a href="#kpi" class="btn btn-outline">
+        <i data-lucide="arrow-down" style="width:16px;height:16px;"></i> 핵심 구현 보기
+      </a>
+    </div>
+
+    <!-- Pipeline Flow -->
+    <div class="pipeline-flow">
+      <div class="flow-label">Pipeline Flow</div>
+      <div class="pipeline-steps">
+        <div class="pipeline-step step-sql">
+          <i data-lucide="database"></i> KPI 갱신 (SQL 7종)
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step step-py">
+          <i data-lucide="shield-check"></i> 정합성 검증 (10종)
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step step-branch">
+          <i data-lucide="git-branch"></i> 3-way 분기
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step step-alert">
+          <i data-lucide="bell-ring"></i> 알림 / 에스컬레이션
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step step-report">
+          <i data-lucide="file-text"></i> 리포트 (CSV/JSON/HTML)
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 2. BACKGROUND ═══════════════════ -->
+<section id="background">
+  <div class="container">
+    <span class="section-label"><i data-lucide="info" style="width:14px;height:14px;"></i> Background</span>
+    <h2 class="section-title">프로젝트 배경 & 목적</h2>
+    <p class="section-desc">
+      금융 데이터는 집계 방식, 기간 기준, 반올림 정책에 따라 KPI 간 불일치가 빈번합니다.
+      수동 검증은 누락 위험이 높고, 이상 탐지가 늦어질수록 의사결정 신뢰도가 하락합니다.
+    </p>
+
+    <div class="bg-grid">
+      <!-- Problem -->
+      <div class="bg-card glass-card">
+        <div class="icon-wrap icon-red"><i data-lucide="alert-triangle"></i></div>
+        <h3>해결할 문제</h3>
+        <p>
+          KPI 지표 간 정합성 불일치가 리포팅 이후에야 발견되는 구조적 한계.<br>
+          점유율 합계 ≠ 100%, 성장률 역산 불일치, 이상치 미탐지 등 수동 검증의 사각지대.
+        </p>
+      </div>
+
+      <!-- Solution -->
+      <div class="bg-card glass-card">
+        <div class="icon-wrap icon-blue"><i data-lucide="check-circle-2"></i></div>
+        <h3>접근 방식</h3>
+        <p>
+          7종 KPI를 SQL로 정의하고, 10종 교차 검증을 자동화.
+          CRITICAL / WARNING / INFO 3단계로 분류해 알림 피로를 방지하면서도 핵심 이슈는 즉시 포착.
+        </p>
+      </div>
+
+      <!-- Principle -->
+      <div class="bg-card glass-card">
+        <div class="icon-wrap icon-purple"><i data-lucide="settings-2"></i></div>
+        <h3>설계 원칙</h3>
+        <p>
+          다층 검증 (합계 → 비율 → 역산 → 범위 → 통계 → 교차).<br>
+          YAML 설정 외부화로 코드 변경 없이 임계값 튜닝.<br>
+          Tableau 뷰 기반 연동으로 실시간 모니터링.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 3. ARCHITECTURE ═══════════════════ -->
+<section id="architecture">
+  <div class="container">
+    <span class="section-label"><i data-lucide="layers" style="width:14px;height:14px;"></i> Architecture</span>
+    <h2 class="section-title">아키텍처 다이어그램</h2>
+    <p class="section-desc">
+      Airflow DAG가 매일 04:00(KST)에 KPI 갱신 → 정합성 검증 → 3-way 분기 → 리포트를 오케스트레이션합니다.
+      PostgreSQL은 지표 저장소, Tableau는 뷰 기반 라이브 연결로 대시보드를 제공합니다.
+    </p>
+
+    <!-- Inline Architecture Diagram (converted from architecture.jsx) -->
+    <div class="glass-card" style="background:rgba(17,24,39,.95); border:1px solid #1e293b; border-radius:16px; padding:24px; overflow-x:auto;">
+      <svg width="960" height="780" viewBox="0 0 960 780" style="display:block; margin:0 auto; max-width:100%; height:auto;" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="glow-accent" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.15"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-critical" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f43f5e" stop-opacity="0.15"/><stop offset="100%" stop-color="#f43f5e" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-warning" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.15"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-pass" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#22c55e" stop-opacity="0.15"/><stop offset="100%" stop-color="#22c55e" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-purple" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.15"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-teal" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.15"/><stop offset="100%" stop-color="#2dd4bf" stop-opacity="0"/></radialGradient>
+          <pattern id="arch-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1e293b" stroke-width="0.3" opacity="0.4"/>
+          </pattern>
+        </defs>
+
+        <!-- Background grid -->
+        <rect width="960" height="780" fill="url(#arch-grid)" opacity="0.5"/>
+
+        <!-- ═══ AIRFLOW DAG CONTAINER ═══ -->
+        <rect x="30" y="20" width="900" height="560" rx="12" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="8 4" opacity="0.5"/>
+        <text x="50" y="48" font-size="11" fill="#38bdf8" font-weight="600" font-family="'JetBrains Mono',monospace" letter-spacing="1.5" opacity="0.8">AIRFLOW DAG — DAILY 04:00 KST</text>
+
+        <!-- ── Pipeline Row ── -->
+        <!-- Node: KPI 갱신 -->
+        <rect x="60" y="80" width="200" height="60" rx="8" fill="#111827" stroke="#38bdf8" stroke-width="1" opacity="0.95"/>
+        <rect x="60" y="80" width="200" height="60" rx="8" fill="url(#glow-accent)" opacity="0.3"/>
+        <text x="74" y="106" font-size="14" fill="#38bdf8" opacity="0.8">⚙</text>
+        <text x="92" y="106" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">KPI 갱신</text>
+        <text x="92" y="122" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">SQL · 7종 KPI</text>
+
+        <!-- Arrow → -->
+        <line x1="260" y1="110" x2="314" y2="110" stroke="#38bdf8" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="320,110 314,114.2 314,105.8" fill="#38bdf8" opacity="0.7"/>
+
+        <!-- Node: 정합성 검증 -->
+        <rect x="320" y="80" width="220" height="60" rx="8" fill="#111827" stroke="#38bdf8" stroke-width="1" opacity="0.95"/>
+        <rect x="320" y="80" width="220" height="60" rx="8" fill="url(#glow-accent)" opacity="0.3"/>
+        <text x="334" y="106" font-size="14" fill="#38bdf8" opacity="0.8">🔍</text>
+        <text x="352" y="106" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">정합성 검증</text>
+        <text x="352" y="122" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">Python · 10종 교차검증</text>
+
+        <!-- Arrow → -->
+        <line x1="540" y1="110" x2="594" y2="110" stroke="#38bdf8" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="600,110 594,114.2 594,105.8" fill="#38bdf8" opacity="0.7"/>
+
+        <!-- Node: 결과 평가 -->
+        <rect x="600" y="80" width="200" height="60" rx="8" fill="#111827" stroke="#a78bfa" stroke-width="1" opacity="0.95"/>
+        <rect x="600" y="80" width="200" height="60" rx="8" fill="url(#glow-purple)" opacity="0.3"/>
+        <text x="614" y="106" font-size="14" fill="#a78bfa" opacity="0.8">📊</text>
+        <text x="632" y="106" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">결과 평가</text>
+        <text x="632" y="122" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">3-way 분기</text>
+
+        <!-- Glow Dots (animated) -->
+        <circle cx="290" cy="110" r="3" fill="#38bdf8" opacity="0.9"><animate attributeName="r" values="3;5;3" dur="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.5s" repeatCount="indefinite"/></circle>
+        <circle cx="290" cy="110" r="8" fill="#38bdf8" opacity="0.15"><animate attributeName="r" values="8;14;8" dur="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.15;0;0.15" dur="2.5s" repeatCount="indefinite"/></circle>
+        <circle cx="570" cy="110" r="3" fill="#38bdf8" opacity="0.9"><animate attributeName="r" values="3;5;3" dur="2.5s" begin="0.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.5s" begin="0.8s" repeatCount="indefinite"/></circle>
+        <circle cx="570" cy="110" r="8" fill="#38bdf8" opacity="0.15"><animate attributeName="r" values="8;14;8" dur="2.5s" begin="0.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.15;0;0.15" dur="2.5s" begin="0.8s" repeatCount="indefinite"/></circle>
+
+        <!-- ═══ 3-WAY BRANCH ═══ -->
+        <!-- Arrow ↓ CRITICAL -->
+        <line x1="700" y1="140" x2="700" y2="189" stroke="#f43f5e" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="700,195 695.8,189 704.2,189" fill="#f43f5e" opacity="0.7"/>
+
+        <!-- Arrow ↙ WARNING -->
+        <line x1="700" y1="140" x2="514.9" y2="271.5" stroke="#f59e0b" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="510,275 512.5,268.1 517.3,275.0" fill="#f59e0b" opacity="0.7"/>
+
+        <!-- Arrow ↙ PASS -->
+        <line x1="700" y1="140" x2="315.3" y2="352.1" stroke="#22c55e" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="310,355 313.2,348.4 317.3,355.8" fill="#22c55e" opacity="0.7"/>
+
+        <!-- Badge: CRITICAL -->
+        <rect x="580" y="195" width="84" height="22" rx="4" fill="rgba(244,63,94,0.08)" stroke="#f43f5e" stroke-width="0.5"/>
+        <text x="588" y="210" font-size="10.5" fill="#f43f5e" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">CRITICAL</text>
+
+        <!-- Node: Slack 알림 + 온콜 에스컬 -->
+        <rect x="580" y="222" width="260" height="56" rx="8" fill="#111827" stroke="#f43f5e" stroke-width="1" opacity="0.95"/>
+        <rect x="580" y="222" width="260" height="56" rx="8" fill="url(#glow-critical)" opacity="0.3"/>
+        <text x="594" y="246" font-size="14" fill="#f43f5e" opacity="0.8">🚨</text>
+        <text x="612" y="246" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">Slack 알림 + 온콜 에스컬</text>
+        <text x="612" y="262" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">즉시 대응 필요</text>
+
+        <!-- Badge: WARNING -->
+        <rect x="380" y="275" width="75.5" height="22" rx="4" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" stroke-width="0.5"/>
+        <text x="388" y="290" font-size="10.5" fill="#f59e0b" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">WARNING</text>
+
+        <!-- Node: Slack 경고 -->
+        <rect x="380" y="302" width="220" height="50" rx="8" fill="#111827" stroke="#f59e0b" stroke-width="1" opacity="0.95"/>
+        <rect x="380" y="302" width="220" height="50" rx="8" fill="url(#glow-warning)" opacity="0.3"/>
+        <text x="394" y="323" font-size="14" fill="#f59e0b" opacity="0.8">⚠</text>
+        <text x="412" y="323" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">Slack 경고</text>
+        <text x="412" y="339" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">모니터링 대상</text>
+
+        <!-- Badge: PASS -->
+        <rect x="180" y="355" width="50" height="22" rx="4" fill="rgba(34,197,94,0.08)" stroke="#22c55e" stroke-width="0.5"/>
+        <text x="188" y="370" font-size="10.5" fill="#22c55e" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">PASS</text>
+
+        <!-- Node: 성공 로그 -->
+        <rect x="180" y="382" width="200" height="50" rx="8" fill="#111827" stroke="#22c55e" stroke-width="1" opacity="0.95"/>
+        <rect x="180" y="382" width="200" height="50" rx="8" fill="url(#glow-pass)" opacity="0.3"/>
+        <text x="194" y="403" font-size="14" fill="#22c55e" opacity="0.8">✓</text>
+        <text x="212" y="403" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">성공 로그</text>
+        <text x="212" y="419" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">정상 처리 완료</text>
+
+        <!-- ═══ CONVERGE TO REPORT ═══ -->
+        <!-- Dashed arrows converging -->
+        <line x1="710" y1="278" x2="484.7" y2="456.3" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="480,460 482.1,453.0 487.3,459.6" fill="#64748b" opacity="0.7"/>
+
+        <line x1="490" y1="352" x2="480.6" y2="454.0" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="480,460 476.4,453.6 484.7,454.4" fill="#64748b" opacity="0.7"/>
+
+        <line x1="280" y1="432" x2="424.1" y2="458.9" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="430,460 423.3,463.0 424.9,454.8" fill="#64748b" opacity="0.7"/>
+
+        <!-- Node: 리포트 생성 -->
+        <rect x="350" y="460" width="260" height="56" rx="8" fill="#111827" stroke="#2dd4bf" stroke-width="1" opacity="0.95"/>
+        <rect x="350" y="460" width="260" height="56" rx="8" fill="url(#glow-teal)" opacity="0.3"/>
+        <text x="364" y="484" font-size="14" fill="#2dd4bf" opacity="0.8">📄</text>
+        <text x="382" y="484" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">리포트 생성</text>
+        <text x="382" y="500" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">CSV / JSON / HTML</text>
+
+        <!-- Arrow ↓ -->
+        <line x1="480" y1="516" x2="480" y2="534" stroke="#2dd4bf" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="480,540 475.8,534 484.2,534" fill="#2dd4bf" opacity="0.7"/>
+
+        <!-- Node: 오래된 리포트 정리 -->
+        <rect x="360" y="540" width="240" height="50" rx="8" fill="#111827" stroke="#64748b" stroke-width="1" opacity="0.95"/>
+        <rect x="360" y="540" width="240" height="50" rx="8" fill="url(#glow-accent)" opacity="0.1"/>
+        <text x="374" y="561" font-size="14" fill="#64748b" opacity="0.8">🗑</text>
+        <text x="392" y="561" font-size="11" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">오래된 리포트 정리</text>
+        <text x="392" y="577" font-size="9.5" fill="#64748b" font-family="'JetBrains Mono',monospace">자동 보관 정책</text>
+
+        <!-- ═══ EXTERNAL SYSTEMS ═══ -->
+        <!-- Dashed arrow → PostgreSQL -->
+        <line x1="350" y1="590" x2="225.3" y2="657.2" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="220,660 223.3,653.5 227.3,660.9" fill="#38bdf8" opacity="0.7"/>
+
+        <!-- Dashed arrow → Tableau -->
+        <line x1="600" y1="590" x2="714.8" y2="657.0" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="720,660 712.7,660.6 716.9,653.4" fill="#a78bfa" opacity="0.7"/>
+
+        <!-- PostgreSQL box -->
+        <rect x="80" y="650" width="280" height="70" rx="10" fill="#0a0e1a" stroke="#38bdf8" stroke-width="1.2"/>
+        <rect x="80" y="650" width="280" height="70" rx="10" fill="url(#glow-accent)" opacity="0.2"/>
+        <text x="104" y="692" font-size="22">🐘</text>
+        <text x="140" y="682" font-size="15" fill="#38bdf8" font-weight="700" font-family="'JetBrains Mono',monospace">PostgreSQL</text>
+        <text x="140" y="702" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">메트릭 DB · 이력 저장</text>
+
+        <!-- Tableau box -->
+        <rect x="600" y="650" width="280" height="70" rx="10" fill="#0a0e1a" stroke="#a78bfa" stroke-width="1.2"/>
+        <rect x="600" y="650" width="280" height="70" rx="10" fill="url(#glow-purple)" opacity="0.2"/>
+        <text x="622" y="692" font-size="22">📈</text>
+        <text x="660" y="682" font-size="15" fill="#a78bfa" font-weight="700" font-family="'JetBrains Mono',monospace">Tableau Dashboard</text>
+        <text x="660" y="702" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">v_dashboard_main</text>
+
+        <!-- ═══ LEGEND ═══ -->
+        <g transform="translate(680,420)">
+          <rect x="0" y="0" width="200" height="120" rx="8" fill="#0a0e1a" stroke="#1e293b" stroke-width="0.5" opacity="0.9"/>
+          <text x="16" y="22" font-size="9.5" fill="#64748b" font-weight="600" letter-spacing="1.5" font-family="'JetBrains Mono',monospace">SEVERITY LEVELS</text>
+          <circle cx="24" cy="44" r="4" fill="#f43f5e"/>
+          <text x="38" y="48" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">Critical — 즉시 대응</text>
+          <circle cx="24" cy="66" r="4" fill="#f59e0b"/>
+          <text x="38" y="70" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">Warning — 확인 필요</text>
+          <circle cx="24" cy="88" r="4" fill="#22c55e"/>
+          <text x="38" y="92" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">Pass — 정상</text>
+          <line x1="16" y1="104" x2="32" y2="104" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="38" y="108" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">데이터 연동</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Architecture footer stats -->
+    <div style="display:flex; gap:32px; margin-top:20px; flex-wrap:wrap; justify-content:center;">
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#38bdf8;">7종</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">KPI Metrics</div></div>
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#38bdf8;">10종</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">Cross Validations</div></div>
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#f59e0b;">3-way</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">Alert Levels</div></div>
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#2dd4bf;">CSV/JSON/HTML</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">Output Formats</div></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 4-1. KPI DESIGN ═══════════════════ -->
+<section id="kpi">
+  <div class="container">
+    <span class="section-label"><i data-lucide="bar-chart-3" style="width:14px;height:14px;"></i> Core Implementation — KPI Design</span>
+    <h2 class="section-title">4-1. KPI 설계 & DM 구축</h2>
+    <p class="section-desc">
+      여신금융협회 원천 데이터를 7종 핵심 KPI로 가공하는 Data Mart를 설계했습니다.
+      Window 함수, CTE, 통계 함수를 활용한 SQL 산출 로직과 Tableau 뷰 연동 구조를 포함합니다.
+    </p>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card glass-card">
+        <span class="kpi-num num-blue">1</span>
+        <h3>월별 카드사별 이용금액</h3>
+        <p class="kpi-def">카드사별 월간 이용금액 합계 + 전월/전년 동월 비교</p>
+        <span class="sql-tag">SUM() + LAG() OVER(PARTITION BY)</span>
+        <span class="unit">억원</span>
+      </div>
+      <div class="kpi-card glass-card">
+        <span class="kpi-num num-purple">2</span>
+        <h3>시장 점유율</h3>
+        <p class="kpi-def">전체 이용금액 대비 카드사 비율 + 점유율 변동(pp)</p>
+        <span class="sql-tag">CTE + RANK() + LAG()</span>
+        <span class="unit">%</span>
+      </div>
+      <div class="kpi-card glass-card">
+        <span class="kpi-num num-teal">3</span>
+        <h3>성장률 (MoM / YoY / 3M MA)</h3>
+        <p class="kpi-def">전월·전년 성장률 + 3개월 이동평균 노이즈 제거</p>
+        <span class="sql-tag">LAG() + AVG() OVER(ROWS BETWEEN)</span>
+        <span class="unit">%</span>
+      </div>
+      <div class="kpi-card glass-card">
+        <span class="kpi-num num-amber">4</span>
+        <h3>업종별 이용 패턴</h3>
+        <p class="kpi-def">카드사별·업종별 비중 + 업종 순위 + 업종 MoM 성장률</p>
+        <span class="sql-tag">WINDOW w_company + RANK()</span>
+        <span class="unit">%</span>
+      </div>
+      <div class="kpi-card glass-card">
+        <span class="kpi-num num-rose">5</span>
+        <h3>카드 활성화율</h3>
+        <p class="kpi-def">발급 대비 이용 카드 비율 + 업계 평균 대비 차이</p>
+        <span class="sql-tag">active / issued + AVG() OVER()</span>
+        <span class="unit">%</span>
+      </div>
+      <div class="kpi-card glass-card">
+        <span class="kpi-num num-green">6</span>
+        <h3>시장 집중도 (HHI / CR3)</h3>
+        <p class="kpi-def">HHI = Σ(점유율²), CR3 = 상위 3사 합산. 과점 수준 판정</p>
+        <span class="sql-tag">POWER() + 서브쿼리 LIMIT 3</span>
+        <span class="unit">지수</span>
+      </div>
+      <div class="kpi-card glass-card">
+        <span class="kpi-num num-orange">7</span>
+        <h3>이상치 탐지</h3>
+        <p class="kpi-def">Z-Score + IQR 기반 이상치 탐지 → CRITICAL/WARNING 분류</p>
+        <span class="sql-tag">STDDEV() + PERCENTILE_CONT()</span>
+        <span class="unit">Z</span>
+      </div>
+    </div>
+
+    <!-- SQL Showcase -->
+    <div class="sql-showcase">
+      <div class="showcase-title">SQL 산출 로직 하이라이트 — KPI 3. 성장률 (MoM / YoY / 3M Moving Average)</div>
+      <pre><code><span class="cmt">-- MoM, YoY, 3개월 이동평균, 연환산 성장률을 한 번에 산출</span>
+<span class="kw">CREATE TABLE</span> <span class="tbl">kpi_growth_rate</span> <span class="kw">AS</span>
+<span class="kw">WITH</span> <span class="alias">base</span> <span class="kw">AS</span> (
+    <span class="kw">SELECT</span> year_month, card_company,
+           total_usage_amount  <span class="kw">AS</span> current_amount,
+           prev_month_amount, prev_year_amount
+    <span class="kw">FROM</span> <span class="tbl">kpi_monthly_usage</span>
+)
+<span class="kw">SELECT</span>
+    b.year_month, b.card_company,
+    <span class="cmt">-- MoM 성장률</span>
+    <span class="fn">ROUND</span>(
+        (b.current_amount - <span class="fn">COALESCE</span>(b.prev_month_amount, <span class="num">0</span>))::NUMERIC
+        / <span class="fn">NULLIF</span>(b.prev_month_amount, <span class="num">0</span>) * <span class="num">100</span>, <span class="num">2</span>
+    )                                           <span class="kw">AS</span> mom_growth_rate,
+    <span class="cmt">-- YoY 성장률</span>
+    <span class="fn">ROUND</span>(
+        (b.current_amount - <span class="fn">COALESCE</span>(b.prev_year_amount, <span class="num">0</span>))::NUMERIC
+        / <span class="fn">NULLIF</span>(b.prev_year_amount, <span class="num">0</span>) * <span class="num">100</span>, <span class="num">2</span>
+    )                                           <span class="kw">AS</span> yoy_growth_rate,
+    <span class="cmt">-- 3개월 이동평균 MoM (노이즈 제거)</span>
+    <span class="fn">ROUND</span>(<span class="fn">AVG</span>(...) <span class="kw">OVER</span> (
+        <span class="kw">PARTITION BY</span> b.card_company
+        <span class="kw">ORDER BY</span> b.year_month <span class="kw">ROWS BETWEEN</span> <span class="num">2</span> <span class="kw">PRECEDING AND CURRENT ROW</span>
+    ), <span class="num">2</span>)                                    <span class="kw">AS</span> mom_3m_moving_avg,
+    <span class="cmt">-- 연환산 성장률 (CAGR 근사)</span>
+    <span class="kw">CASE WHEN</span> b.prev_year_amount > <span class="num">0</span> <span class="kw">THEN</span>
+        <span class="fn">ROUND</span>(<span class="fn">POWER</span>(b.current_amount / b.prev_year_amount, <span class="num">1.0</span>) - <span class="num">1</span>) * <span class="num">100</span>, <span class="num">2</span>)
+    <span class="kw">END</span>                                         <span class="kw">AS</span> annual_growth_rate
+<span class="kw">FROM</span> <span class="alias">base</span> b;</code></pre>
+    </div>
+
+    <!-- Tableau View Note -->
+    <div style="margin-top: 24px; padding: 18px 24px; border-radius: 12px; background: rgba(139,92,246,.05); border: 1px solid rgba(139,92,246,.12);">
+      <span style="font-size: 0.78rem; color: #a78bfa; font-weight: 600;">
+        <i data-lucide="link" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i>
+        Tableau 연동 — 7개 KPI 테이블을 JOIN한 <code style="color:#c084fc;">v_dashboard_main</code> 뷰를 통해 라이브 연결합니다.
+        별도 ETL 없이 PostgreSQL 뷰 하나로 Tableau 데이터소스를 제공합니다.
+      </span>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 4-2. INTEGRITY CHECKS ═══════════════════ -->
+<section id="integrity">
+  <div class="container">
+    <span class="section-label"><i data-lucide="shield-check" style="width:14px;height:14px;"></i> Core Implementation — Integrity Checks</span>
+    <h2 class="section-title">4-2. 정합성 검증 체계</h2>
+    <p class="section-desc">
+      10종 교차 검증으로 KPI 간 논리적 일관성을 자동 검증합니다.
+      합계 → 비율 → 역산 → 범위 → 연속성 → 통계 → 교차의 다층 구조로 설계했습니다.
+    </p>
+
+    <!-- 10 Checks Table -->
+    <div class="check-table-wrap">
+      <table class="check-table">
+        <thead>
+          <tr>
+            <th style="width:36px;">#</th>
+            <th>검증 항목</th>
+            <th>카테고리</th>
+            <th>심각도</th>
+            <th>판정 기준</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>전체 이용금액 = 카드사별 합계</td>
+            <td class="mono">sum_integrity</td>
+            <td><span class="badge badge-critical">CRITICAL</span></td>
+            <td>차이 &lt; 1원</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>시장 점유율 합계 = 100%</td>
+            <td class="mono">ratio_integrity</td>
+            <td><span class="badge badge-critical">CRITICAL</span></td>
+            <td>차이 &lt; 0.1%</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>업종별 비율 합계 = 100% (카드사별)</td>
+            <td class="mono">ratio_integrity</td>
+            <td><span class="badge badge-warning">WARNING</span></td>
+            <td>차이 &lt; 0.5%</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>MoM 성장률 역산 검증</td>
+            <td class="mono">formula_integrity</td>
+            <td><span class="badge badge-warning">WARNING</span></td>
+            <td>역산 차이 &lt; 10원</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>YoY 성장률 역산 검증</td>
+            <td class="mono">formula_integrity</td>
+            <td><span class="badge badge-warning">WARNING</span></td>
+            <td>역산 차이 &lt; 10원</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>활성화율 범위 (0~100%)</td>
+            <td class="mono">range_integrity</td>
+            <td><span class="badge badge-critical">CRITICAL</span></td>
+            <td>범위 이탈 = FAIL</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>데이터 연속성 (월 누락)</td>
+            <td class="mono">continuity_integrity</td>
+            <td><span class="badge badge-critical">CRITICAL</span></td>
+            <td>누락 = FAIL</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>HHI 범위 (0~10000)</td>
+            <td class="mono">range_integrity</td>
+            <td><span class="badge badge-warning">WARNING</span></td>
+            <td>범위 이탈 = FAIL</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>Z-Score 이상치 비율 &lt; 5%</td>
+            <td class="mono">statistical_integrity</td>
+            <td><span class="badge badge-warning">WARNING</span></td>
+            <td>CRITICAL 비율 &gt; 5%</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td>점유율 변동 ↔ 성장률 교차 검증</td>
+            <td class="mono">cross_kpi_integrity</td>
+            <td><span class="badge badge-info">INFO</span></td>
+            <td>방향 불일치 = FAIL</td>
+            <td><span class="badge badge-pass">PASS</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Severity Cards -->
+    <div class="severity-cards">
+      <div class="sev-card sev-critical">
+        <h4>🔴 CRITICAL</h4>
+        <p class="sev-action">즉시 Slack 알림 + 온콜 에스컬레이션 (2회 연속 시)</p>
+        <p class="sev-checks">CHECK 1, 2, 6, 7 — 기본 합계·비율·범위·연속성 불일치</p>
+      </div>
+      <div class="sev-card sev-warning">
+        <h4>🟡 WARNING</h4>
+        <p class="sev-action">Slack 경고 + 일별 리포트 포함</p>
+        <p class="sev-checks">CHECK 3, 4, 5, 8, 9 — 업종비율·역산·HHI·이상치</p>
+      </div>
+      <div class="sev-card sev-info">
+        <h4>🔵 INFO</h4>
+        <p class="sev-action">로그 기록 + 리포트 참고용</p>
+        <p class="sev-checks">CHECK 10 — KPI 간 방향성 교차 검증</p>
+      </div>
+    </div>
+
+    <!-- Branch Logic -->
+    <div style="margin-top: 32px; padding: 22px 28px; border-radius: 14px; background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.05);">
+      <div style="font-size: 0.72rem; font-weight: 600; color: #475176; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">3-Way Branch Logic (BranchPythonOperator)</div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; line-height: 1.8; color: #8b93a7;">
+        <span style="color: #c084fc;">if</span> overall_status == <span style="color: #34d399;">"CRITICAL"</span><span style="color: #3d4562;"> →</span> <span style="color: #f87171;">alert_critical → escalate_to_oncall</span><br>
+        <span style="color: #c084fc;">elif</span> overall_status == <span style="color: #34d399;">"WARNING"</span><span style="color: #3d4562;">  →</span> <span style="color: #fbbf24;">alert_warning</span><br>
+        <span style="color: #c084fc;">else</span><span style="color: #3d4562;">                           →</span> <span style="color: #34d399;">log_success</span><br>
+        <span style="color: #3d4562;">──────────────────────────────────────</span><br>
+        <span style="color: #3d4562;">모든 분기 →</span> <span style="color: #60a5fa;">generate_report (CSV/JSON/HTML)</span> → <span style="color: #60a5fa;">cleanup_old_reports</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 4-3. TABLEAU ═══════════════════ -->
+<section id="tableau">
+  <div class="container">
+    <span class="section-label"><i data-lucide="layout-dashboard" style="width:14px;height:14px;"></i> Core Implementation — Tableau</span>
+    <h2 class="section-title">4-3. Tableau 대시보드 3종</h2>
+    <p class="section-desc">
+      PostgreSQL 뷰를 통한 라이브 연결로 3종 대시보드를 구성합니다.
+      아래는 실제 프로젝트 데이터 모델 기반의 인터랙티브 목업입니다.
+    </p>
+
+    <!-- ── Dashboard Tabs ── -->
+    <div class="dash-tabs">
+      <button class="dash-tab active" data-tab="tab-overview">
+        <i data-lucide="pie-chart" style="width:14px;height:14px;"></i> KPI 개요
+      </button>
+      <button class="dash-tab" data-tab="tab-growth">
+        <i data-lucide="trending-up" style="width:14px;height:14px;"></i> 성장 트렌드
+      </button>
+      <button class="dash-tab" data-tab="tab-quality">
+        <i data-lucide="shield-check" style="width:14px;height:14px;"></i> 정합성 모니터링
+      </button>
+    </div>
+
+    <!-- ════════ Dashboard 1: KPI 개요 ════════ -->
+    <div class="dash-panel active" id="tab-overview">
+      <div class="dash-header">
+        <div>
+          <h3 class="dash-title">KPI 개요 대시보드</h3>
+          <p class="dash-sub">카드사별 핵심 KPI 현황 · <span class="view-tag-inline">v_dashboard_main</span></p>
+        </div>
+        <div class="dash-period">2024.01 – 2025.12 (24개월)</div>
+      </div>
+
+      <!-- KPI Scorecards -->
+      <div class="scorecard-row">
+        <div class="scorecard">
+          <div class="sc-label">전체 이용금액 (최신월)</div>
+          <div class="sc-value">22.4<span class="sc-unit">조원</span></div>
+          <div class="sc-change positive">▲ 3.2% MoM</div>
+        </div>
+        <div class="scorecard">
+          <div class="sc-label">1위 점유율</div>
+          <div class="sc-value">18.7<span class="sc-unit">%</span></div>
+          <div class="sc-change positive">▲ 0.3pp</div>
+        </div>
+        <div class="scorecard">
+          <div class="sc-label">평균 활성화율</div>
+          <div class="sc-value">70.2<span class="sc-unit">%</span></div>
+          <div class="sc-change negative">▼ 0.5pp</div>
+        </div>
+        <div class="scorecard">
+          <div class="sc-label">HHI 집중도</div>
+          <div class="sc-value">1,342<span class="sc-unit">pt</span></div>
+          <div class="sc-change neutral">경쟁적 시장</div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="chart-row-2">
+        <div class="chart-box glass-card">
+          <div class="chart-title">카드사별 월별 이용금액 추이</div>
+          <canvas id="chartUsageTrend"></canvas>
+        </div>
+        <div class="chart-box chart-box-sm glass-card">
+          <div class="chart-title">시장 점유율 (최신월)</div>
+          <canvas id="chartMarketShare"></canvas>
+        </div>
+      </div>
+
+      <!-- Activation Bar -->
+      <div class="chart-box glass-card" style="margin-top:16px;">
+        <div class="chart-title">카드사별 활성화율 vs 업계 평균 (70.2%)</div>
+        <canvas id="chartActivation" style="max-height:260px;"></canvas>
+      </div>
+    </div>
+
+    <!-- ════════ Dashboard 2: 성장 트렌드 ════════ -->
+    <div class="dash-panel" id="tab-growth">
+      <div class="dash-header">
+        <div>
+          <h3 class="dash-title">성장 트렌드 대시보드</h3>
+          <p class="dash-sub">MoM / YoY 성장 추이 · <span class="view-tag-inline">v_dashboard_market_structure</span></p>
+        </div>
+        <div class="dash-period">시장 전체 기준</div>
+      </div>
+
+      <!-- Growth Charts -->
+      <div class="chart-row-2">
+        <div class="chart-box glass-card">
+          <div class="chart-title">MoM / YoY 성장률 + 3M 이동평균</div>
+          <canvas id="chartGrowthRate"></canvas>
+        </div>
+        <div class="chart-box glass-card">
+          <div class="chart-title">HHI 시장 집중도 추이</div>
+          <canvas id="chartHHI"></canvas>
+        </div>
+      </div>
+
+      <!-- Category Heatmap -->
+      <div class="chart-box glass-card" style="margin-top:16px;">
+        <div class="chart-title">업종별 카드사 이용금액 비중 (%)</div>
+        <div class="heatmap-wrap" id="heatmapWrap"></div>
+      </div>
+    </div>
+
+    <!-- ════════ Dashboard 3: 정합성 모니터링 ════════ -->
+    <div class="dash-panel" id="tab-quality">
+      <div class="dash-header">
+        <div>
+          <h3 class="dash-title">정합성 모니터링 대시보드</h3>
+          <p class="dash-sub">10종 검증 결과 · <span class="view-tag-inline">v_integrity_daily_trend</span></p>
+        </div>
+        <div class="dash-period">최근 30일</div>
+      </div>
+
+      <!-- Quality Scorecards -->
+      <div class="scorecard-row">
+        <div class="scorecard">
+          <div class="sc-label">오늘 통과율</div>
+          <div class="sc-value" style="color:#34d399;">100<span class="sc-unit">%</span></div>
+          <div class="sc-change positive">전체 PASS</div>
+        </div>
+        <div class="scorecard">
+          <div class="sc-label">CRITICAL 실패</div>
+          <div class="sc-value" style="color:#34d399;">0<span class="sc-unit">건</span></div>
+          <div class="sc-change neutral">정상</div>
+        </div>
+        <div class="scorecard">
+          <div class="sc-label">총 검증 건수</div>
+          <div class="sc-value">87<span class="sc-unit">건</span></div>
+          <div class="sc-change neutral">10종 × 다중 대상</div>
+        </div>
+        <div class="scorecard">
+          <div class="sc-label">평균 통과율 (30일)</div>
+          <div class="sc-value" style="color:#34d399;">98.4<span class="sc-unit">%</span></div>
+          <div class="sc-change positive">▲ 1.2%</div>
+        </div>
+      </div>
+
+      <!-- Quality Charts -->
+      <div class="chart-row-2">
+        <div class="chart-box glass-card">
+          <div class="chart-title">일별 통과율 추이 (최근 30일)</div>
+          <canvas id="chartPassRate"></canvas>
+        </div>
+        <div class="chart-box chart-box-sm glass-card">
+          <div class="chart-title">심각도별 검증 분포</div>
+          <canvas id="chartSeverity"></canvas>
+        </div>
+      </div>
+
+      <!-- Pass/Fail Matrix -->
+      <div class="chart-box glass-card" style="margin-top:16px;">
+        <div class="chart-title">검증 항목별 Pass / Fail 상태 (최근 7일)</div>
+        <div class="matrix-wrap" id="matrixWrap"></div>
+      </div>
+    </div>
+
+    <!-- View Connection Structure -->
+    <div style="margin-top: 28px; padding: 22px 28px; border-radius: 14px; background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.05);">
+      <div style="font-size: 0.72rem; font-weight: 600; color: #475176; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">뷰 기반 연결 구조 — PostgreSQL → Tableau Live Connection</div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.73rem; line-height: 1.8; color: #8b93a7;">
+        <span style="color:#60a5fa;">v_dashboard_main</span>             = kpi_monthly_usage <span style="color:#3d4562;">⋈</span> kpi_market_share <span style="color:#3d4562;">⋈</span> kpi_growth_rate <span style="color:#3d4562;">⋈</span> kpi_activation_rate <span style="color:#3d4562;">⋈</span> kpi_anomaly_detection<br>
+        <span style="color:#60a5fa;">v_dashboard_market_structure</span>  = kpi_market_concentration + <span style="color:#fbbf24;">LAG()</span> HHI 변동<br>
+        <span style="color:#60a5fa;">v_integrity_daily_trend</span>      = integrity_check_log <span style="color:#fbbf24;">GROUP BY</span> check_date<br>
+        <span style="color:#60a5fa;">v_integrity_critical_failures</span> = integrity_check_log <span style="color:#fbbf24;">WHERE</span> severity=<span style="color:#34d399;">'CRITICAL'</span> AND status=<span style="color:#f87171;">'FAIL'</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 5. TECH STACK ═══════════════════ -->
+<section id="stack">
+  <div class="container">
+    <span class="section-label"><i data-lucide="cpu" style="width:14px;height:14px;"></i> Tech Stack</span>
+    <h2 class="section-title">기술 스택</h2>
+
+    <div class="stack-grid">
+      <div class="stack-item glass-card">
+        <div class="stack-icon si-pg">PG</div>
+        <h4>PostgreSQL 14+</h4>
+        <p>Window 함수, CTE, 통계 함수<br>KPI 산출 + Tableau 뷰</p>
+      </div>
+      <div class="stack-item glass-card">
+        <div class="stack-icon si-py">Py</div>
+        <h4>Python 3.11</h4>
+        <p>Dataclass, Enum<br>정합성 검증 엔진</p>
+      </div>
+      <div class="stack-item glass-card">
+        <div class="stack-icon si-air">AF</div>
+        <h4>Apache Airflow 2.7</h4>
+        <p>TaskGroup, Branch<br>SLA, 콜백 알림</p>
+      </div>
+      <div class="stack-item glass-card">
+        <div class="stack-icon si-tab">Tb</div>
+        <h4>Tableau</h4>
+        <p>뷰 기반 라이브 연결<br>3종 대시보드</p>
+      </div>
+      <div class="stack-item glass-card">
+        <div class="stack-icon si-dock">🐳</div>
+        <h4>Docker Compose</h4>
+        <p>Airflow + PostgreSQL<br>원클릭 기동</p>
+      </div>
+      <div class="stack-item glass-card">
+        <div class="stack-icon si-test">Ts</div>
+        <h4>pytest + coverage</h4>
+        <p>단위/통합 테스트<br>30+ 케이스</p>
+      </div>
+      <div class="stack-item glass-card">
+        <div class="stack-icon si-yaml">YA</div>
+        <h4>YAML 설정</h4>
+        <p>임계값 외부화<br>코드 변경 없이 튜닝</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 6. DESIGN DECISIONS ═══════════════════ -->
+<section id="decisions">
+  <div class="container">
+    <span class="section-label"><i data-lucide="lightbulb" style="width:14px;height:14px;"></i> Design Decisions</span>
+    <h2 class="section-title">주요 설계 결정</h2>
+
+    <div class="decision-grid">
+      <div class="decision-card glass-card">
+        <div class="q"><i data-lucide="help-circle" style="width:18px;height:18px;"></i> 왜 10종 교차 검증인가?</div>
+        <p class="a">
+          단순 합계 검증만으로는 지표 품질을 보장할 수 없습니다.
+          <strong style="color:#c4c9d8;">비율 정합 → 산출식 역산 → 범위 검증 → 통계적 이상치 → KPI 간 교차 검증</strong>까지
+          다층적으로 검증해야 프로덕션 수준의 데이터 품질이 확보됩니다.
+        </p>
+      </div>
+      <div class="decision-card glass-card">
+        <div class="q"><i data-lucide="help-circle" style="width:18px;height:18px;"></i> 왜 3단계 심각도인가?</div>
+        <p class="a">
+          모든 실패를 동일하게 처리하면 <strong style="color:#c4c9d8;">알림 피로(Alert Fatigue)</strong>가 발생합니다.
+          CRITICAL은 즉시 대응, WARNING은 일별 리뷰, INFO는 참고용으로 분류해
+          운영 효율성을 확보했습니다.
+        </p>
+      </div>
+      <div class="decision-card glass-card">
+        <div class="q"><i data-lucide="help-circle" style="width:18px;height:18px;"></i> 왜 YAML 설정 관리인가?</div>
+        <p class="a">
+          임계값을 코드에 하드코딩하면 변경마다 배포가 필요합니다.
+          YAML로 분리하면 <strong style="color:#c4c9d8;">코드 변경 없이 임계값 튜닝</strong>이 가능하고,
+          환경별 설정 관리가 용이합니다. Airflow DAG에서도 동적으로 로드합니다.
+        </p>
+      </div>
+      <div class="decision-card glass-card">
+        <div class="q"><i data-lucide="help-circle" style="width:18px;height:18px;"></i> 왜 HTML 리포트인가?</div>
+        <p class="a">
+          JSON/CSV는 시스템 간 연동에 적합하지만, 비개발 직군(PM, 분석가)에게는
+          <strong style="color:#c4c9d8;">시각적 리포트</strong>가 필요합니다.
+          HTML은 브라우저에서 바로 확인 가능하고, Slack/이메일 첨부도 용이합니다.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 7. TESTS ═══════════════════ -->
+<section id="tests">
+  <div class="container">
+    <span class="section-label"><i data-lucide="flask-conical" style="width:14px;height:14px;"></i> Testing</span>
+    <h2 class="section-title">테스트</h2>
+    <p class="section-desc">
+      pytest 기반 30+ 케이스로 검증 엔진의 정확성을 보장합니다.
+      유틸리티 함수, 10종 개별 검증, 리포트 내보내기, 통합 파이프라인까지 전수 커버합니다.
+    </p>
+
+    <div class="test-summary">
+      <div class="test-stat glass-card">
+        <div class="num">30+</div>
+        <div class="label">테스트 케이스</div>
+      </div>
+      <div class="test-stat glass-card">
+        <div class="num">10</div>
+        <div class="label">검증 카테고리</div>
+      </div>
+      <div class="test-stat glass-card">
+        <div class="num">3</div>
+        <div class="label">내보내기 포맷</div>
+      </div>
+      <div class="test-stat glass-card">
+        <div class="num">1</div>
+        <div class="label">통합 파이프라인</div>
+      </div>
+    </div>
+
+    <div class="test-categories">
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#60a5fa;"></span>
+        <span class="cat-name">통계 유틸리티</span>
+        <span class="cat-count">Z-Score, IQR, Trend Break</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#a78bfa;"></span>
+        <span class="cat-name">설정 로더</span>
+        <span class="cat-count">기본값, YAML 로드</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#f87171;"></span>
+        <span class="cat-name">합계 정합성</span>
+        <span class="cat-count">PASS / FAIL 케이스</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#fbbf24;"></span>
+        <span class="cat-name">비율 정합성</span>
+        <span class="cat-count">점유율, 업종 비율</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#34d399;"></span>
+        <span class="cat-name">산출식 역산</span>
+        <span class="cat-count">MoM / YoY + NULL 처리</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#fb7185;"></span>
+        <span class="cat-name">범위 검증</span>
+        <span class="cat-count">활성화율 0~100%</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#2dd4bf;"></span>
+        <span class="cat-name">연속성 검증</span>
+        <span class="cat-count">월 누락 탐지</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#fb923c;"></span>
+        <span class="cat-name">통계 / 교차 검증</span>
+        <span class="cat-count">이상치, 방향성</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#818cf8;"></span>
+        <span class="cat-name">리포트 내보내기</span>
+        <span class="cat-count">CSV, JSON, HTML</span>
+      </div>
+      <div class="test-cat glass-card">
+        <span class="dot" style="background:#e879f9;"></span>
+        <span class="cat-name">통합 테스트</span>
+        <span class="cat-count">10종 풀 파이프라인</span>
+      </div>
+    </div>
+
+    <!-- Test Command -->
+    <div style="margin-top: 24px; padding: 16px 22px; border-radius: 10px; background: rgba(15,20,35,.7); border: 1px solid rgba(255,255,255,.05);">
+      <code style="font-size: 0.78rem; color: #8b93a7;">
+        <span style="color: #34d399;">$</span> pytest tests/ -v --cov=scripts --cov-report=term-missing
+      </code>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 8. PRACTICAL CONNECTION ═══════════════════ -->
+<section id="practical">
+  <div class="container">
+    <span class="section-label"><i data-lucide="briefcase" style="width:14px;height:14px;"></i> Practical Connection</span>
+    <h2 class="section-title">실무 연결 포인트</h2>
+    <p class="section-desc">
+      이 프로젝트의 각 구현 요소가 실무 데이터 엔지니어링 업무에 어떻게 대응하는지 매핑합니다.
+    </p>
+
+    <div class="practical-table-wrap">
+      <table class="practical-table">
+        <thead>
+          <tr>
+            <th>실무 대응 영역</th>
+            <th>프로젝트 구현</th>
+            <th>핵심 코드 / 산출물</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="highlight">DW/DM 설계·구축·운영</td>
+            <td>7종 KPI SQL 산출 로직 설계<br>원천 테이블 → KPI 테이블 → Tableau 뷰</td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #60a5fa;">
+              kpi_definitions.sql (367 lines)<br>
+              CREATE TABLE kpi_* + CREATE VIEW v_dashboard_*
+            </td>
+          </tr>
+          <tr>
+            <td class="highlight">비즈니스 데이터 모델 설계</td>
+            <td>카드사 이용실적 → 7종 KPI 정의<br>금융 도메인 특화 지표 (HHI, CR3, 활성화율)</td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #60a5fa;">
+              HHI = Σ(점유율²), CR3 서브쿼리<br>
+              POWER() + PERCENTILE_CONT()
+            </td>
+          </tr>
+          <tr>
+            <td class="highlight">데이터 모니터링 · 품질 관리</td>
+            <td>10종 교차 정합성 검증 + 3단계 심각도<br>PASS/FAIL 자동 분기 + Slack 알림 (Webhook 기반, fallback 로깅)</td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #60a5fa;">
+              run_integrity_checks.py (1,119 lines)<br>
+              MetricsIntegrityChecker 클래스
+            </td>
+          </tr>
+          <tr>
+            <td class="highlight">[우대] Tableau</td>
+            <td>3종 대시보드 설계<br>PostgreSQL 뷰 기반 라이브 연결</td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #60a5fa;">
+              v_dashboard_main / v_dashboard_market_structure<br>
+              v_integrity_daily_trend
+            </td>
+          </tr>
+          <tr>
+            <td class="highlight">[우대] 보험/금융 도메인 이해</td>
+            <td>여신금융협회 데이터 기반<br>카드사 8개사 × 업종 10종 × 24개월</td>
+            <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #60a5fa;">
+              generate_sample_data.py<br>
+              신한/삼성/KB/현대/우리/하나/롯데/BC
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Differentiation from ecommerce-event-pipeline -->
+    <div style="margin-top: 36px;">
+      <div style="font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; color: #475176; text-transform: uppercase; margin-bottom: 16px;">vs. ecommerce-event-pipeline — 상호 보완 구조</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="glass-card" style="padding: 24px;">
+          <div style="font-size: 0.75rem; font-weight: 700; color: #60a5fa; margin-bottom: 10px;">📦 ecommerce-event-pipeline</div>
+          <div style="font-size: 0.78rem; color: #7c849a; line-height: 1.7;">
+            • 핵심 역량: <strong style="color:#c4c9d8;">Airflow ETL 설계·개발</strong><br>
+            • 도메인: 이커머스 행동 로그<br>
+            • 품질 검증: 7종 (데이터 레벨)<br>
+            • 시각화: 없음<br>
+            • 강조: 파이프라인 엔지니어링
+          </div>
+        </div>
+        <div class="glass-card" style="padding: 24px; border-color: rgba(96,165,250,.2);">
+          <div style="font-size: 0.75rem; font-weight: 700; color: #a78bfa; margin-bottom: 10px;">📊 metrics-quality-dashboard <span class="badge badge-pass" style="margin-left: 6px;">현재 프로젝트</span></div>
+          <div style="font-size: 0.78rem; color: #7c849a; line-height: 1.7;">
+            • 핵심 역량: <strong style="color:#c4c9d8;">KPI/DM 설계 + 데이터 품질</strong><br>
+            • 도메인: 금융 (카드사 이용실적)<br>
+            • 품질 검증: 10종 (KPI 교차 검증)<br>
+            • 시각화: <strong style="color:#c4c9d8;">Tableau 3종 대시보드</strong><br>
+            • 강조: 비즈니스 지표 설계 + 모니터링
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════ 9. FOOTER ═══════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/jiminnote/metrics-quality-dashboard" target="_blank">
+        <i data-lucide="github" style="width:16px;height:16px;"></i> GitHub
+      </a>
+      <a href="mailto:wlals3968@naver.com">
+        <i data-lucide="mail" style="width:16px;height:16px;"></i> Email
+      </a>
+    </div>
+    <p class="copyright">© 2026 KPI 정합성 모니터링 대시보드. Built with PostgreSQL, Python, Airflow & Tableau.</p>
+  </div>
+</footer>
+
+
+<!-- Lucide Icons Init + Dashboard Charts -->
+<script>
+lucide.createIcons();
+
+/* ═══════════════════ TAB SWITCHING ═══════════════════ */
+document.querySelectorAll('.dash-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const panel = document.getElementById(tab.dataset.tab);
+    if (panel) panel.classList.add('active');
+    lucide.createIcons();
+  });
+});
+
+/* ═══════════════════ CHART.JS DEFAULTS ═══════════════════ */
+Chart.defaults.color = '#6b7490';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.04)';
+Chart.defaults.font.family = "'Noto Sans KR','Inter',sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.pointStyleWidth = 8;
+Chart.defaults.plugins.legend.labels.boxHeight = 7;
+Chart.defaults.plugins.legend.labels.padding = 16;
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,20,35,0.95)';
+Chart.defaults.plugins.tooltip.titleFont = { weight: '600', size: 12 };
+Chart.defaults.plugins.tooltip.bodyFont = { size: 11 };
+Chart.defaults.plugins.tooltip.padding = 12;
+Chart.defaults.plugins.tooltip.cornerRadius = 8;
+Chart.defaults.plugins.tooltip.borderColor = 'rgba(255,255,255,0.08)';
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+
+const MONTHS = ['24.01','24.02','24.03','24.04','24.05','24.06','24.07','24.08','24.09','24.10','24.11','24.12',
+                '25.01','25.02','25.03','25.04','25.05','25.06','25.07','25.08','25.09','25.10','25.11','25.12'];
+
+const COMPANIES = ['신한카드','삼성카드','KB국민카드','현대카드','우리카드','하나카드','롯데카드','BC카드'];
+
+const COLORS = ['#60a5fa','#a78bfa','#f87171','#fbbf24','#34d399','#fb923c','#e879f9','#2dd4bf'];
+const COLORS_30 = COLORS.map(c => c + '30');
+
+/* ═══════════════════ DATA GENERATORS ═══════════════════ */
+function seededRandom(seed) {
+  let s = seed;
+  return function() { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
+
+function genUsageData() {
+  const rng = seededRandom(42);
+  const base = [4200,3800,4000,2800,2200,2100,1800,1500];
+  const data = COMPANIES.map((_, ci) => {
+    return MONTHS.map((_, mi) => {
+      const yr = mi < 12 ? 0 : 1;
+      const mo = mi % 12;
+      const seasonal = 1 + Math.sin(2*Math.PI*(mo-2)/12)*0.06 + (mo===0?0.03:0) + (mo>=10?0.05:0);
+      const growth = 1 + yr * 0.035;
+      return Math.round(base[ci] * growth * seasonal * (0.96 + rng()*0.08));
+    });
+  });
+  return data;
+}
+
+const usageData = genUsageData();
+
+/* ═══════════════════ DASHBOARD 1: KPI OVERVIEW ═══════════════════ */
+// Chart 1: Usage Trend (Line)
+new Chart(document.getElementById('chartUsageTrend'), {
+  type: 'line',
+  data: {
+    labels: MONTHS,
+    datasets: COMPANIES.slice(0,5).map((name, i) => ({
+      label: name,
+      data: usageData[i],
+      borderColor: COLORS[i],
+      backgroundColor: COLORS_30[i],
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.3,
+      fill: false
+    }))
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 2.2,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}백만원`
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.03)' },
+        ticks: { callback: v => (v/1000).toFixed(0)+'K', font: { size: 10 } },
+        title: { display: true, text: '백만원', font: { size: 10 } }
+      }
+    }
+  }
+});
+
+// Chart 2: Market Share Doughnut
+const latestUsage = usageData.map(d => d[d.length-1]);
+const totalUsage = latestUsage.reduce((a,b)=>a+b, 0);
+const shareData = latestUsage.map(v => Math.round(v/totalUsage*1000)/10);
+
+new Chart(document.getElementById('chartMarketShare'), {
+  type: 'doughnut',
+  data: {
+    labels: COMPANIES,
+    datasets: [{
+      data: shareData,
+      backgroundColor: COLORS,
+      borderColor: '#0b0f1a',
+      borderWidth: 2,
+      hoverOffset: 6
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 1.15,
+    cutout: '55%',
+    plugins: {
+      legend: { position: 'right', labels: { font: { size: 10 }, padding: 10 } },
+      tooltip: {
+        callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed}%` }
+      }
+    }
+  }
+});
+
+// Chart 3: Activation Rate Bar
+const rng2 = seededRandom(77);
+const activationRates = COMPANIES.map(() => Math.round((62 + rng2()*16)*10)/10);
+const industryAvg = 70.2;
+
+new Chart(document.getElementById('chartActivation'), {
+  type: 'bar',
+  data: {
+    labels: COMPANIES,
+    datasets: [
+      {
+        label: '활성화율',
+        data: activationRates,
+        backgroundColor: activationRates.map(v => v >= industryAvg ? 'rgba(52,211,153,0.6)' : 'rgba(248,113,113,0.5)'),
+        borderColor: activationRates.map(v => v >= industryAvg ? '#34d399' : '#f87171'),
+        borderWidth: 1,
+        borderRadius: 6
+      },
+      {
+        label: '업계 평균',
+        data: Array(8).fill(industryAvg),
+        type: 'line',
+        borderColor: '#fbbf24',
+        borderWidth: 2,
+        borderDash: [6,4],
+        pointRadius: 0,
+        fill: false
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    aspectRatio: 3.2,
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%` } }
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: {
+        min: 55, max: 85,
+        grid: { color: 'rgba(255,255,255,0.03)' },
+        ticks: { callback: v => v + '%', font: { size: 10 } }
+      }
+    }
+  }
+});
+
+/* ═══════════════════ DASHBOARD 2: GROWTH TREND ═══════════════════ */
+// Generate market total per month
+const marketTotal = MONTHS.map((_, mi) => usageData.reduce((sum, comp) => sum + comp[mi], 0));
+
+// MoM / YoY growth
+const momGrowth = marketTotal.map((v, i) => i === 0 ? null : Math.round((v/marketTotal[i-1]-1)*10000)/100);
+const yoyGrowth = marketTotal.map((v, i) => i < 12 ? null : Math.round((v/marketTotal[i-12]-1)*10000)/100);
+const ma3 = momGrowth.map((_, i) => {
+  if (i < 2 || momGrowth[i]===null) return null;
+  const vals = [momGrowth[i], momGrowth[i-1], momGrowth[i-2]].filter(v=>v!==null);
+  return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100 : null;
+});
+
+new Chart(document.getElementById('chartGrowthRate'), {
+  type: 'line',
+  data: {
+    labels: MONTHS,
+    datasets: [
+      {
+        label: 'MoM 성장률 (%)',
+        data: momGrowth,
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96,165,250,0.08)',
+        borderWidth: 2, pointRadius: 2, pointHoverRadius: 5,
+        tension: 0.3, fill: true
+      },
+      {
+        label: 'YoY 성장률 (%)',
+        data: yoyGrowth,
+        borderColor: '#a78bfa',
+        borderWidth: 2, pointRadius: 2, pointHoverRadius: 5,
+        borderDash: [4,3], tension: 0.3, fill: false
+      },
+      {
+        label: '3M 이동평균',
+        data: ma3,
+        borderColor: '#fbbf24',
+        borderWidth: 2.5, pointRadius: 0,
+        tension: 0.4, fill: false
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true, aspectRatio: 2,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: { callbacks: { label: ctx => ctx.parsed.y !== null ? `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%` : '' } }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.03)' },
+        ticks: { callback: v => v.toFixed(1) + '%', font: { size: 10 } }
+      }
+    }
+  }
+});
+
+// HHI Chart
+const hhiData = MONTHS.map((_, mi) => {
+  const total = usageData.reduce((s, c) => s + c[mi], 0);
+  return Math.round(usageData.reduce((s, c) => s + Math.pow(c[mi]/total*100, 2), 0));
+});
+
+new Chart(document.getElementById('chartHHI'), {
+  type: 'line',
+  data: {
+    labels: MONTHS,
+    datasets: [
+      {
+        label: 'HHI 지수',
+        data: hhiData,
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52,211,153,0.06)',
+        borderWidth: 2.5, pointRadius: 2, pointHoverRadius: 5,
+        tension: 0.3, fill: true
+      },
+      {
+        label: '과점 기준선 (1,500)',
+        data: Array(24).fill(1500),
+        borderColor: 'rgba(248,113,113,0.4)',
+        borderWidth: 1.5, borderDash: [8,4],
+        pointRadius: 0, fill: false
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true, aspectRatio: 2,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}` } }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } },
+      y: {
+        min: 1100, max: 1700,
+        grid: { color: 'rgba(255,255,255,0.03)' },
+        ticks: { font: { size: 10 } },
+        title: { display: true, text: 'HHI', font: { size: 10 } }
+      }
+    }
+  }
+});
+
+// Heatmap: Category × Company
+(function buildHeatmap() {
+  const categories = ['음식점','주유소','대형마트','온라인쇼핑','교통','의료','교육','여행/숙박','보험','기타'];
+  const weights = [20,10,14,22,8,7,6,7,3,3];
+  const rng = seededRandom(99);
+
+  let html = '<table class="hm-table"><thead><tr><th></th>';
+  COMPANIES.forEach(c => { html += `<th>${c.replace('카드','')}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  categories.forEach((cat, ci) => {
+    html += `<tr><td class="row-header">${cat}</td>`;
+    COMPANIES.forEach(() => {
+      const val = Math.round(weights[ci] * (0.7 + rng()*0.6) * 10) / 10;
+      const intensity = Math.min(val / 30, 1);
+      const bg = `rgba(96,165,250,${(intensity * 0.5 + 0.04).toFixed(2)})`;
+      html += `<td style="background:${bg};color:${intensity>0.4?'#e8eaf0':'#8b93a7'};font-weight:${intensity>0.3?600:400}">${val}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('heatmapWrap').innerHTML = html;
+})();
+
+
+/* ═══════════════════ DASHBOARD 3: QUALITY MONITORING ═══════════════════ */
+// Pass Rate Trend (30 days)
+const rng3 = seededRandom(2026);
+const days30 = Array.from({length:30}, (_, i) => {
+  const d = new Date(2026, 1, 14);
+  d.setDate(d.getDate() - 29 + i);
+  return `${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getDate().toString().padStart(2,'0')}`;
+});
+const passRates = days30.map(() => {
+  const r = rng3();
+  return r < 0.08 ? Math.round((92 + rng3()*5)*10)/10 : Math.round((98 + rng3()*2)*10)/10;
+});
+passRates[passRates.length-1] = 100;
+
+new Chart(document.getElementById('chartPassRate'), {
+  type: 'line',
+  data: {
+    labels: days30,
+    datasets: [
+      {
+        label: '통과율 (%)',
+        data: passRates,
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52,211,153,0.06)',
+        borderWidth: 2, pointRadius: 1.5, pointHoverRadius: 5,
+        tension: 0.3, fill: true,
+        pointBackgroundColor: passRates.map(v => v < 95 ? '#f87171' : '#34d399')
+      },
+      {
+        label: '목표선 (95%)',
+        data: Array(30).fill(95),
+        borderColor: 'rgba(251,191,36,0.4)',
+        borderWidth: 1.5, borderDash: [8,4],
+        pointRadius: 0, fill: false
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true, aspectRatio: 2.2,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom' } },
+    scales: {
+      x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 9 }, maxTicksLimit: 15 } },
+      y: {
+        min: 88, max: 101,
+        grid: { color: 'rgba(255,255,255,0.03)' },
+        ticks: { callback: v => v + '%', font: { size: 10 } }
+      }
+    }
+  }
+});
+
+// Severity Distribution Doughnut
+new Chart(document.getElementById('chartSeverity'), {
+  type: 'doughnut',
+  data: {
+    labels: ['CRITICAL (4종)', 'WARNING (5종)', 'INFO (1종)'],
+    datasets: [{
+      data: [35, 42, 10],
+      backgroundColor: ['rgba(248,113,113,0.7)', 'rgba(251,191,36,0.7)', 'rgba(96,165,250,0.7)'],
+      borderColor: '#0b0f1a',
+      borderWidth: 2,
+      hoverOffset: 6
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true, aspectRatio: 1.15,
+    cutout: '55%',
+    plugins: {
+      legend: { position: 'right', labels: { font: { size: 10 }, padding: 10 } },
+      tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed}건` } }
+    }
+  }
+});
+
+// Pass/Fail Matrix (10 checks × 7 days)
+(function buildMatrix() {
+  const checks = [
+    '합계 정합성','점유율 = 100%','업종 비율','MoM 역산','YoY 역산',
+    '활성화율 범위','데이터 연속성','HHI 범위','Z-Score 이상치','교차 검증'
+  ];
+  const sevColors = {0:'#f87171',1:'#f87171',2:'#fbbf24',3:'#fbbf24',4:'#fbbf24',5:'#f87171',6:'#f87171',7:'#fbbf24',8:'#fbbf24',9:'#60a5fa'};
+  const rng = seededRandom(314);
+  const recentDays = days30.slice(-7);
+
+  let html = '<table class="mx-table"><thead><tr><th style="text-align:left;">검증 항목</th>';
+  recentDays.forEach(d => { html += `<th>${d}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  checks.forEach((check, ci) => {
+    html += `<tr><td class="row-header">${check}</td>`;
+    recentDays.forEach(() => {
+      const pass = rng() > 0.06;
+      if (pass) {
+        html += '<td><span style="color:#34d399;font-weight:700;font-size:0.8rem;">✓</span></td>';
+      } else {
+        html += `<td><span style="color:${sevColors[ci]};font-weight:700;font-size:0.8rem;">✗</span></td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('matrixWrap').innerHTML = html;
+})();
+</script>
+
+</body>
+</html>
