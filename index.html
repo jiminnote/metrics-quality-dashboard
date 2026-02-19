@@ -705,8 +705,184 @@
       PostgreSQL은 지표 저장소, Tableau는 뷰 기반 라이브 연결로 대시보드를 제공합니다.
     </p>
 
-    <div class="glass-card arch-img-wrap">
-      <img src="assets/architecture.png" alt="Airflow DAG 아키텍처 — KPI 갱신 SQL → 정합성 검증 Py → 결과 평가(3-way 분기) → 리포트 / PostgreSQL → Tableau Dashboard" class="arch-img" />
+    <!-- Inline Architecture Diagram (converted from architecture.jsx) -->
+    <div class="glass-card" style="background:rgba(17,24,39,.95); border:1px solid #1e293b; border-radius:16px; padding:24px; overflow-x:auto;">
+      <svg width="960" height="780" viewBox="0 0 960 780" style="display:block; margin:0 auto; max-width:100%; height:auto;" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="glow-accent" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#38bdf8" stop-opacity="0.15"/><stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-critical" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f43f5e" stop-opacity="0.15"/><stop offset="100%" stop-color="#f43f5e" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-warning" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.15"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-pass" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#22c55e" stop-opacity="0.15"/><stop offset="100%" stop-color="#22c55e" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-purple" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.15"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></radialGradient>
+          <radialGradient id="glow-teal" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.15"/><stop offset="100%" stop-color="#2dd4bf" stop-opacity="0"/></radialGradient>
+          <pattern id="arch-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1e293b" stroke-width="0.3" opacity="0.4"/>
+          </pattern>
+        </defs>
+
+        <!-- Background grid -->
+        <rect width="960" height="780" fill="url(#arch-grid)" opacity="0.5"/>
+
+        <!-- ═══ AIRFLOW DAG CONTAINER ═══ -->
+        <rect x="30" y="20" width="900" height="560" rx="12" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="8 4" opacity="0.5"/>
+        <text x="50" y="48" font-size="11" fill="#38bdf8" font-weight="600" font-family="'JetBrains Mono',monospace" letter-spacing="1.5" opacity="0.8">AIRFLOW DAG — DAILY 04:00 KST</text>
+
+        <!-- ── Pipeline Row ── -->
+        <!-- Node: KPI 갱신 -->
+        <rect x="60" y="80" width="200" height="60" rx="8" fill="#111827" stroke="#38bdf8" stroke-width="1" opacity="0.95"/>
+        <rect x="60" y="80" width="200" height="60" rx="8" fill="url(#glow-accent)" opacity="0.3"/>
+        <text x="74" y="106" font-size="14" fill="#38bdf8" opacity="0.8">⚙</text>
+        <text x="92" y="106" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">KPI 갱신</text>
+        <text x="92" y="122" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">SQL · 7종 KPI</text>
+
+        <!-- Arrow → -->
+        <line x1="260" y1="110" x2="314" y2="110" stroke="#38bdf8" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="320,110 314,114.2 314,105.8" fill="#38bdf8" opacity="0.7"/>
+
+        <!-- Node: 정합성 검증 -->
+        <rect x="320" y="80" width="220" height="60" rx="8" fill="#111827" stroke="#38bdf8" stroke-width="1" opacity="0.95"/>
+        <rect x="320" y="80" width="220" height="60" rx="8" fill="url(#glow-accent)" opacity="0.3"/>
+        <text x="334" y="106" font-size="14" fill="#38bdf8" opacity="0.8">🔍</text>
+        <text x="352" y="106" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">정합성 검증</text>
+        <text x="352" y="122" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">Python · 10종 교차검증</text>
+
+        <!-- Arrow → -->
+        <line x1="540" y1="110" x2="594" y2="110" stroke="#38bdf8" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="600,110 594,114.2 594,105.8" fill="#38bdf8" opacity="0.7"/>
+
+        <!-- Node: 결과 평가 -->
+        <rect x="600" y="80" width="200" height="60" rx="8" fill="#111827" stroke="#a78bfa" stroke-width="1" opacity="0.95"/>
+        <rect x="600" y="80" width="200" height="60" rx="8" fill="url(#glow-purple)" opacity="0.3"/>
+        <text x="614" y="106" font-size="14" fill="#a78bfa" opacity="0.8">📊</text>
+        <text x="632" y="106" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">결과 평가</text>
+        <text x="632" y="122" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">3-way 분기</text>
+
+        <!-- Glow Dots (animated) -->
+        <circle cx="290" cy="110" r="3" fill="#38bdf8" opacity="0.9"><animate attributeName="r" values="3;5;3" dur="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.5s" repeatCount="indefinite"/></circle>
+        <circle cx="290" cy="110" r="8" fill="#38bdf8" opacity="0.15"><animate attributeName="r" values="8;14;8" dur="2.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.15;0;0.15" dur="2.5s" repeatCount="indefinite"/></circle>
+        <circle cx="570" cy="110" r="3" fill="#38bdf8" opacity="0.9"><animate attributeName="r" values="3;5;3" dur="2.5s" begin="0.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.4;0.9" dur="2.5s" begin="0.8s" repeatCount="indefinite"/></circle>
+        <circle cx="570" cy="110" r="8" fill="#38bdf8" opacity="0.15"><animate attributeName="r" values="8;14;8" dur="2.5s" begin="0.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.15;0;0.15" dur="2.5s" begin="0.8s" repeatCount="indefinite"/></circle>
+
+        <!-- ═══ 3-WAY BRANCH ═══ -->
+        <!-- Arrow ↓ CRITICAL -->
+        <line x1="700" y1="140" x2="700" y2="189" stroke="#f43f5e" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="700,195 695.8,189 704.2,189" fill="#f43f5e" opacity="0.7"/>
+
+        <!-- Arrow ↙ WARNING -->
+        <line x1="700" y1="140" x2="514.9" y2="271.5" stroke="#f59e0b" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="510,275 512.5,268.1 517.3,275.0" fill="#f59e0b" opacity="0.7"/>
+
+        <!-- Arrow ↙ PASS -->
+        <line x1="700" y1="140" x2="315.3" y2="352.1" stroke="#22c55e" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="310,355 313.2,348.4 317.3,355.8" fill="#22c55e" opacity="0.7"/>
+
+        <!-- Badge: CRITICAL -->
+        <rect x="580" y="195" width="84" height="22" rx="4" fill="rgba(244,63,94,0.08)" stroke="#f43f5e" stroke-width="0.5"/>
+        <text x="588" y="210" font-size="10.5" fill="#f43f5e" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">CRITICAL</text>
+
+        <!-- Node: Slack 알림 + 온콜 에스컬 -->
+        <rect x="580" y="222" width="260" height="56" rx="8" fill="#111827" stroke="#f43f5e" stroke-width="1" opacity="0.95"/>
+        <rect x="580" y="222" width="260" height="56" rx="8" fill="url(#glow-critical)" opacity="0.3"/>
+        <text x="594" y="246" font-size="14" fill="#f43f5e" opacity="0.8">🚨</text>
+        <text x="612" y="246" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">Slack 알림 + 온콜 에스컬</text>
+        <text x="612" y="262" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">즉시 대응 필요</text>
+
+        <!-- Badge: WARNING -->
+        <rect x="380" y="275" width="75.5" height="22" rx="4" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" stroke-width="0.5"/>
+        <text x="388" y="290" font-size="10.5" fill="#f59e0b" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">WARNING</text>
+
+        <!-- Node: Slack 경고 -->
+        <rect x="380" y="302" width="220" height="50" rx="8" fill="#111827" stroke="#f59e0b" stroke-width="1" opacity="0.95"/>
+        <rect x="380" y="302" width="220" height="50" rx="8" fill="url(#glow-warning)" opacity="0.3"/>
+        <text x="394" y="323" font-size="14" fill="#f59e0b" opacity="0.8">⚠</text>
+        <text x="412" y="323" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">Slack 경고</text>
+        <text x="412" y="339" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">모니터링 대상</text>
+
+        <!-- Badge: PASS -->
+        <rect x="180" y="355" width="50" height="22" rx="4" fill="rgba(34,197,94,0.08)" stroke="#22c55e" stroke-width="0.5"/>
+        <text x="188" y="370" font-size="10.5" fill="#22c55e" font-weight="700" font-family="'JetBrains Mono',monospace" letter-spacing="0.5">PASS</text>
+
+        <!-- Node: 성공 로그 -->
+        <rect x="180" y="382" width="200" height="50" rx="8" fill="#111827" stroke="#22c55e" stroke-width="1" opacity="0.95"/>
+        <rect x="180" y="382" width="200" height="50" rx="8" fill="url(#glow-pass)" opacity="0.3"/>
+        <text x="194" y="403" font-size="14" fill="#22c55e" opacity="0.8">✓</text>
+        <text x="212" y="403" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">성공 로그</text>
+        <text x="212" y="419" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">정상 처리 완료</text>
+
+        <!-- ═══ CONVERGE TO REPORT ═══ -->
+        <!-- Dashed arrows converging -->
+        <line x1="710" y1="278" x2="484.7" y2="456.3" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="480,460 482.1,453.0 487.3,459.6" fill="#64748b" opacity="0.7"/>
+
+        <line x1="490" y1="352" x2="480.6" y2="454.0" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="480,460 476.4,453.6 484.7,454.4" fill="#64748b" opacity="0.7"/>
+
+        <line x1="280" y1="432" x2="424.1" y2="458.9" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="430,460 423.3,463.0 424.9,454.8" fill="#64748b" opacity="0.7"/>
+
+        <!-- Node: 리포트 생성 -->
+        <rect x="350" y="460" width="260" height="56" rx="8" fill="#111827" stroke="#2dd4bf" stroke-width="1" opacity="0.95"/>
+        <rect x="350" y="460" width="260" height="56" rx="8" fill="url(#glow-teal)" opacity="0.3"/>
+        <text x="364" y="484" font-size="14" fill="#2dd4bf" opacity="0.8">📄</text>
+        <text x="382" y="484" font-size="13" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">리포트 생성</text>
+        <text x="382" y="500" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">CSV / JSON / HTML</text>
+
+        <!-- Arrow ↓ -->
+        <line x1="480" y1="516" x2="480" y2="534" stroke="#2dd4bf" stroke-width="1.5" opacity="0.7"/>
+        <polygon points="480,540 475.8,534 484.2,534" fill="#2dd4bf" opacity="0.7"/>
+
+        <!-- Node: 오래된 리포트 정리 -->
+        <rect x="360" y="540" width="240" height="50" rx="8" fill="#111827" stroke="#64748b" stroke-width="1" opacity="0.95"/>
+        <rect x="360" y="540" width="240" height="50" rx="8" fill="url(#glow-accent)" opacity="0.1"/>
+        <text x="374" y="561" font-size="14" fill="#64748b" opacity="0.8">🗑</text>
+        <text x="392" y="561" font-size="11" fill="#e2e8f0" font-weight="600" font-family="'JetBrains Mono',monospace">오래된 리포트 정리</text>
+        <text x="392" y="577" font-size="9.5" fill="#64748b" font-family="'JetBrains Mono',monospace">자동 보관 정책</text>
+
+        <!-- ═══ EXTERNAL SYSTEMS ═══ -->
+        <!-- Dashed arrow → PostgreSQL -->
+        <line x1="350" y1="590" x2="225.3" y2="657.2" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="220,660 223.3,653.5 227.3,660.9" fill="#38bdf8" opacity="0.7"/>
+
+        <!-- Dashed arrow → Tableau -->
+        <line x1="600" y1="590" x2="714.8" y2="657.0" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.7"/>
+        <polygon points="720,660 712.7,660.6 716.9,653.4" fill="#a78bfa" opacity="0.7"/>
+
+        <!-- PostgreSQL box -->
+        <rect x="80" y="650" width="280" height="70" rx="10" fill="#0a0e1a" stroke="#38bdf8" stroke-width="1.2"/>
+        <rect x="80" y="650" width="280" height="70" rx="10" fill="url(#glow-accent)" opacity="0.2"/>
+        <text x="104" y="692" font-size="22">🐘</text>
+        <text x="140" y="682" font-size="15" fill="#38bdf8" font-weight="700" font-family="'JetBrains Mono',monospace">PostgreSQL</text>
+        <text x="140" y="702" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">메트릭 DB · 이력 저장</text>
+
+        <!-- Tableau box -->
+        <rect x="600" y="650" width="280" height="70" rx="10" fill="#0a0e1a" stroke="#a78bfa" stroke-width="1.2"/>
+        <rect x="600" y="650" width="280" height="70" rx="10" fill="url(#glow-purple)" opacity="0.2"/>
+        <text x="622" y="692" font-size="22">📈</text>
+        <text x="660" y="682" font-size="15" fill="#a78bfa" font-weight="700" font-family="'JetBrains Mono',monospace">Tableau Dashboard</text>
+        <text x="660" y="702" font-size="10.5" fill="#64748b" font-family="'JetBrains Mono',monospace">v_dashboard_main</text>
+
+        <!-- ═══ LEGEND ═══ -->
+        <g transform="translate(680,420)">
+          <rect x="0" y="0" width="200" height="120" rx="8" fill="#0a0e1a" stroke="#1e293b" stroke-width="0.5" opacity="0.9"/>
+          <text x="16" y="22" font-size="9.5" fill="#64748b" font-weight="600" letter-spacing="1.5" font-family="'JetBrains Mono',monospace">SEVERITY LEVELS</text>
+          <circle cx="24" cy="44" r="4" fill="#f43f5e"/>
+          <text x="38" y="48" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">Critical — 즉시 대응</text>
+          <circle cx="24" cy="66" r="4" fill="#f59e0b"/>
+          <text x="38" y="70" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">Warning — 확인 필요</text>
+          <circle cx="24" cy="88" r="4" fill="#22c55e"/>
+          <text x="38" y="92" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">Pass — 정상</text>
+          <line x1="16" y1="104" x2="32" y2="104" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="38" y="108" font-size="10.5" fill="#94a3b8" font-family="'JetBrains Mono',monospace">데이터 연동</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Architecture footer stats -->
+    <div style="display:flex; gap:32px; margin-top:20px; flex-wrap:wrap; justify-content:center;">
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#38bdf8;">7종</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">KPI Metrics</div></div>
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#38bdf8;">10종</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">Cross Validations</div></div>
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#f59e0b;">3-way</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">Alert Levels</div></div>
+      <div style="text-align:center;"><div style="font-size:1.1rem; font-weight:700; color:#2dd4bf;">CSV/JSON/HTML</div><div style="font-size:0.68rem; color:#64748b; letter-spacing:1px;">Output Formats</div></div>
     </div>
   </div>
 </section>
